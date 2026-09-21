@@ -168,10 +168,14 @@ export default function ProgramsPage() {
   const handleBulkFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
+    // Backend caps at 50 files per bulk request (multer array limit).
+    const selected = Array.from(files).slice(0, 50);
+    if (files.length > 50) {
+      toast.error('Maximum 50 files per bulk upload. Only the first 50 were added.');
+    }
     setBulkDetecting(true);
     const items: typeof bulkFiles = [];
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+    for (const file of selected) {
       const meta = await readAudioMetadata(file);
       items.push({ file, meta });
     }
@@ -193,26 +197,31 @@ export default function ProgramsPage() {
     if (bulkFiles.length === 0 || !selectedProgram) return;
     setCreating(true);
     setBulkProgress({ done: 0, total: bulkFiles.length });
-
-    for (let i = 0; i < bulkFiles.length; i++) {
-      const item = bulkFiles[i];
+    try {
       const fd = new FormData();
-      fd.append('title', item.meta.title);
-      fd.append('artist', item.meta.artist);
-      fd.append('album', item.meta.album);
+      for (const item of bulkFiles) {
+        fd.append('titles', item.meta.title || item.file.name.replace(/\.[^.]+$/, ''));
+        fd.append('artists', item.meta.artist);
+        fd.append('albums', item.meta.album);
+        fd.append('audio_files', item.file);
+      }
       fd.append('track_type', bulkTrackType);
       fd.append('program_id', selectedProgram);
-      fd.append('audio_file', item.file);
-      await api.createTrack(fd);
-      setBulkProgress({ done: i + 1, total: bulkFiles.length });
-    }
 
-    setShowBulkUpload(false);
-    setBulkFiles([]);
-    loadTracks(selectedProgram);
-    loadPrograms();
-    setCreating(false);
-    toast.success('All tracks uploaded successfully');
+      // Single request with all files so big batches don't trip the per-IP
+      // write rate limit imposed on the single-upload endpoint.
+      await api.bulkUploadTracks(fd);
+      setShowBulkUpload(false);
+      setBulkFiles([]);
+      loadTracks(selectedProgram);
+      loadPrograms();
+      toast.success('All tracks uploaded successfully');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to upload tracks');
+    } finally {
+      setCreating(false);
+      setBulkProgress({ done: 0, total: 0 });
+    }
   };
 
   // --- Track Management ---
