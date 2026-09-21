@@ -1,0 +1,19 @@
+{
+  "nav": {
+    "home": "መነሻ",
+    "leadership": "አመራር",
+    "about": "ስለ እኛ",
+    "gallery": "ፎቶ ማዕከል",
+    "contact": "ያግኙን",
+    "divisions": "ክፍሎች",
+    "partner": "ከእኛ ጋር ይተባበሩ",
+    "aboutYdcs": "ስለ የምሥራች ድምጽ",
+    "missionVision": "ተልዕኮና ራዕይ",
+    "history": "ታሪካችን",
+    "allDivisions": "ሁሉም ክፍሎች",
+    "electronicMedia": "የኤሌክትሮኒክ ሚዲያ ክፍል",
+    "printMedia": "የህትመት ሚዲያ ክፍል",
+    "finance": "የፋይናንስ ክፍል",
+    "programs": "የመርሐግብር ቤተ መዛግብት"
+  }
+}

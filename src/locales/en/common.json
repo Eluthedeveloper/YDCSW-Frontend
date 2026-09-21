@@ -1,0 +1,19 @@
+{
+  "nav": {
+    "home": "Home",
+    "leadership": "Leadership",
+    "about": "About",
+    "gallery": "Gallery",
+    "contact": "Contact",
+    "divisions": "Divisions",
+    "partner": "Partner With Us",
+    "aboutYdcs": "About Yemisrach Dimts",
+    "missionVision": "Mission & Vision",
+    "history": "Our History",
+    "allDivisions": "All Divisions",
+    "electronicMedia": "Electronic Media Device Division",
+    "printMedia": "Print Media Division",
+    "finance": "Finance Division",
+    "programs": "Program Library"
+  }
+}
