@@ -1,3 +1,4 @@
+import { errorMessage } from '../utils/errors';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePlayerAuth } from '../context/AuthContext';
@@ -18,8 +19,8 @@ export default function LoginPage() {
     try {
       await login(username, password);
       navigate('/admin/player/dashboard');
-    } catch (err: any) {
-      setError(err.message || 'Login failed');
+    } catch (err: unknown) {
+      setError(errorMessage(err, 'Login failed'));
     } finally {
       setLoading(false);
     }

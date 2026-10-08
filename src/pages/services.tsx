@@ -66,7 +66,7 @@ export function ServicesPage(): React.ReactElement {
           <div className="mx-auto max-w-7xl px-6 lg:px-12">
             <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
               {[
-                { key: 'projects', value: '500+', label: 'Projects' },
+                { key: 'projects', value: '50+', label: 'Projects' },
                 { key: 'clients', value: '100+', label: 'Partners' },
                 { key: 'languages', value: '12+', label: 'Languages' },
                 { key: 'years', value: '40+', label: 'Years' },

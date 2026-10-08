@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
+import type { Comment } from '../utils/types';
 import { api } from '../utils/api';
 import { MessageCircle, Search, FolderOpen } from 'lucide-react';
 
 export default function CommentsPage() {
-  const [comments, setComments] = useState<any[]>([]);
+  const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
@@ -14,7 +15,7 @@ export default function CommentsPage() {
   const filtered = comments.filter((c) =>
     c.guest_name.toLowerCase().includes(search.toLowerCase()) ||
     c.content.toLowerCase().includes(search.toLowerCase()) ||
-    c.program_title.toLowerCase().includes(search.toLowerCase())
+    (c.program_title ?? '').toLowerCase().includes(search.toLowerCase())
   );
 
   if (loading) {

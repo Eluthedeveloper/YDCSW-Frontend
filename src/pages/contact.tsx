@@ -1,8 +1,10 @@
+import { errorMessage } from '../player/utils/errors';
 import React, { useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
 import { SiteShell } from "../components/site/SiteShell";
 import { API_BASE } from "../lib/apiBase";
+import { site, mapEmbedUrl, mapDirectionsUrl } from "../lib/site";
 
 const icons: Record<string, React.ReactNode> = {
   Email: (
@@ -78,8 +80,8 @@ export function ContactPage(): React.ReactElement {
       }
 
       setSent(true);
-    } catch (err: any) {
-      setError(err.message || "Something went wrong. Please try again.");
+    } catch (err: unknown) {
+      setError(errorMessage(err, "Something went wrong. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -114,8 +116,8 @@ export function ContactPage(): React.ReactElement {
             <div className="lg:col-span-3">
               <div className="h-full overflow-hidden rounded-3xl border border-border shadow-[var(--shadow-elegant)]">
                 <iframe
-                  title="EECMY – Yemisrach Dimts Communication Services"
-                  src="https://maps.google.com/maps?q=XPCJ%2B8Q9%2C%20Guinea%20Bissau%20St%2C%20Addis%20Ababa%2C%20Ethiopia&z=16&hl=en&output=embed"
+                  title={`${site.organisation} — location map`}
+                  src={mapEmbedUrl}
                   width="100%"
                   height="100%"
                   frameBorder="0"
@@ -129,23 +131,23 @@ export function ContactPage(): React.ReactElement {
             </div>
             <div className="flex flex-col justify-center rounded-3xl border border-border bg-card p-8 shadow-[var(--shadow-elegant)] lg:col-span-2">
               <p className="text-xs uppercase tracking-[0.3em] text-gold">{t("contact.sidebar.heading")}</p>
-              <h2 className="mt-4 font-serif text-3xl text-foreground sm:text-4xl">Yemisrach Dimts Communication Service</h2>
+              <h2 className="mt-4 font-serif text-3xl text-foreground sm:text-4xl">{site.organisation}</h2>
               <ul className="mt-6 space-y-3 text-sm text-muted-foreground">
                 <li className="flex items-start gap-3">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mt-0.5 h-4 w-4 shrink-0 text-gold"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" /></svg>
-                  XPCJ+8Q9, Guinea Bissau St, Addis Ababa, Ethiopia
+                  {site.address}
                 </li>
                 <li className="flex items-start gap-3">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mt-0.5 h-4 w-4 shrink-0 text-gold"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                  info@yemisrachdimts.org
+                  <a href={`mailto:${site.email}`} className="transition hover:text-gold">{site.email}</a>
                 </li>
                 <li className="flex items-start gap-3">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mt-0.5 h-4 w-4 shrink-0 text-gold"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.362 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.574 2.81.7A2 2 0 0122 16.92z" /></svg>
-                  +251 (0) 11 123 4567
+                  <a href={`tel:${site.phoneHref}`} className="transition hover:text-gold">{site.phone}</a>
                 </li>
               </ul>
               <a
-                href="https://maps.google.com/maps?q=XPCJ%2B8Q9%2C%20Guinea%20Bissau%20St%2C%20Addis%20Ababa%2C%20Ethiopia"
+                href={mapDirectionsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-8 inline-flex w-fit items-center gap-2 rounded-full bg-gold px-8 py-4 text-sm font-semibold text-gold-foreground shadow-[var(--shadow-gold)] transition hover:scale-105"

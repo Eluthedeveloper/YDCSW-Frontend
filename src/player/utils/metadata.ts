@@ -1,3 +1,12 @@
+/** Shape of the subset of ID3 tags this app reads. */
+interface MediaTag {
+  tags?: {
+    title?: string;
+    artist?: string;
+    album?: string;
+  };
+}
+
 export interface AudioMetadata {
   title: string;
   artist: string;
@@ -17,8 +26,8 @@ export async function readAudioMetadata(file: File): Promise<AudioMetadata> {
 
     return new Promise((resolve) => {
       jsmediatags.read(file, {
-        onSuccess: (tag: any) => {
-          const tags = tag.tags || {};
+        onSuccess: (tag: MediaTag) => {
+          const tags = tag.tags ?? {};
           resolve({
             title: tags.title || fallback.title,
             artist: tags.artist || '',

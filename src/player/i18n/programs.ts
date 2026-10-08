@@ -1,5 +1,9 @@
 // English
 export const programsEn = {
+  loadError: {
+    title: "Couldn't load this content",
+    retry: "Try again",
+  },
   home: {
     welcome: "Welcome to",
     brand: "Yemisrach Dimts Program Library",
@@ -64,6 +68,7 @@ export const programsEn = {
     subtitle: "Browse and play audio content",
     programs: "Programs",
     selectProgram: "Select a program",
+    noPrograms: "No programs yet",
     noTracks: "No tracks to display",
     unknownArtist: "Unknown Artist",
     tracks: "tracks",
@@ -73,7 +78,7 @@ export const programsEn = {
     programs: "Program Library",
     latestTracks: "Latest Tracks",
     search: "Search",
-    homepage: "Homepage",
+    backHome: "Back to Home",
     admin: "Admin",
     brand: "Yemisrach Dimts",
   },
@@ -82,10 +87,41 @@ export const programsEn = {
     program: "Program",
     unknownArtist: "Unknown Artist",
   },
+  playbackError: {
+    network: "Couldn't load this audio. Check your connection.",
+    unsupported: "This audio file isn't supported by your browser.",
+    unknown: "Playback failed. Please try again.",
+    retry: "Retry",
+  },
+  shuffle: { label: "Shuffle" },
+  repeat: {
+    label: { off: "Repeat off", all: "Repeat all", one: "Repeat one" },
+  },
+  controls: {
+    play: "Play",
+    pause: "Pause",
+    next: "Next track",
+    previous: "Previous track",
+    close: "Close player",
+    mute: "Mute",
+    unmute: "Unmute",
+    volume: "Volume",
+    seekForward: "Forward 10 seconds",
+    seekBack: "Back 10 seconds",
+  },
+  like: {
+    label: "Like this track",
+    labelActive: "Remove your like",
+    failed: "Couldn't save your like. Please try again.",
+  },
 };
 
 // Amharic (corrected)
 export const programsAm: typeof programsEn = {
+  loadError: {
+    title: "ይህን ይዘት መረጃ መጫን አልተቻለም",
+    retry: "እንደገና ሞክር",
+  },
   home: {
     welcome: "እንኳን ደህና መጡ",
     brand: "የምስራች ድምጽ ፕሮግራም ቤተ መዛግብት",
@@ -150,6 +186,7 @@ export const programsAm: typeof programsEn = {
     subtitle: "የድምጽ ይዘቶችን ያስሱ እና ያጫውቱ",
     programs: "ፕሮግራሞች",
     selectProgram: "ፕሮግራም ይምረጡ",
+    noPrograms: "እስካሁን ፕሮግራም የለም",
     noTracks: "የሚታይ ትራክ የለም",
     unknownArtist: "አልታወቀ አርቲስት",
     tracks: "ትራኮች",
@@ -159,7 +196,7 @@ export const programsAm: typeof programsEn = {
     programs: "የፕሮግራም ቤተ መዛግብት",
     latestTracks: "የቅርብ ጊዜ ትራኮች",
     search: "ፈልግ",
-    homepage: "መነሻ ገጽ",
+    backHome: "ወደ መነሻ ተመለስ",
     admin: "አስተዳዳሪ",
     brand: "የምስራች ድምጽ",
   },
@@ -168,10 +205,45 @@ export const programsAm: typeof programsEn = {
     program: "ፕሮግራም",
     unknownArtist: "አልታወቀ አርቲስት",
   },
+  playbackError: {
+    network: "ይህን ድምጽ መጫን አልተቻለም። የግንኙነትዎን ያረጋግጡ።",
+    unsupported: "የዚህ ድምጽ ፋይል በአሳሽርዎ አይደገፍም።",
+    unknown: "ማጫወት አልተሳካም። እንደገና ይሞክሩ።",
+    retry: "እንደገና",
+  },
+  shuffle: { label: "በደራሽ የተቀመጠ" },
+  repeat: {
+    label: {
+      off: "ድጋሚነት ጠፍቷል",
+      all: "ሁሉንም ድጋሚ",
+      one: "አንዱን ድጋሚ",
+    },
+  },
+  controls: {
+    play: "አጫውት",
+    pause: "አቁም",
+    next: "ቀጣይ ትራክ",
+    previous: "የቀዳሚው ትራክ",
+    close: "ማጫወቻውን ዝጋ",
+    mute: "ድምጽ አስዝጋ",
+    unmute: "ድምጽ ክፈት",
+    volume: "የድምጽ መጠን",
+    seekForward: "10 ሰከንድ ወደ ፍላጎት ቀጥል",
+    seekBack: "10 ሰከንድ ወደ ኋላ ተመለስ",
+  },
+  like: {
+    label: "ይህን ትራክ ይመልካሉ",
+    labelActive: "መልካምዎን ያስወግዱ",
+    failed: "መልካምውን ማስቀመጥ አልተቻለም። እንደገና ይሞክሩ።",
+  },
 };
 
 // Oromo (corrected)
 export const programsOm: typeof programsEn = {
+  loadError: {
+    title: "Kontentii kana hin dheeffine",
+    retry: "Irra deebi'i",
+  },
   home: {
     welcome: "Baga Nagaan Dhuftan",
     brand: "Kuusaa Piroogiraamii Yemisrach Dimts",
@@ -236,6 +308,7 @@ export const programsOm: typeof programsEn = {
     subtitle: "Qabiyyee sagalee daawwadhaa fi taphachiisi",
     programs: "Piroogiraamota",
     selectProgram: "Piroogiraama filadhu",
+    noPrograms: "Piroogiraamni hin jiru",
     noTracks: "Traakiin agarsiisuuf hin jiru",
     unknownArtist: "Artistii Hin Beekamne",
     tracks: "traakiiwwan",
@@ -245,7 +318,7 @@ export const programsOm: typeof programsEn = {
     programs: "Kuusaa Piroogiraamii",
     latestTracks: "Traakiiwwan Dhiyoo",
     search: "Barbaadi",
-    homepage: "Fuula Jalqabaa",
+    backHome: "Fuula Jalqabaa Deebi'i",
     admin: "Admin",
     brand: "Yemisrach Dimts",
   },
@@ -253,5 +326,36 @@ export const programsOm: typeof programsEn = {
     playingFrom: "Irraa taphachaa jira",
     program: "Piroogiraama",
     unknownArtist: "Artistii Hin Beekamne",
+  },
+  playbackError: {
+    network: "Kutaa kana hin dheeffine. Walqixxtee kee qaba.",
+    unsupported: "Kutaan kana biraa miilaan hin dhaqqabu.",
+    unknown: "Taphachaa hin guutumne. Irra deebi'i.",
+    retry: "Irra deebi'i",
+  },
+  shuffle: { label: "Kuusaa qofaaraa" },
+  repeat: {
+    label: {
+      off: "Irra deebi'uu dhaqate",
+      all: "Hundaa irra deebi'i",
+      one: "Kutaa tokko irra deebi'i",
+    },
+  },
+  controls: {
+    play: "Taphadhu",
+    pause: "Dhaabi",
+    next: "Kutaa itti aanu",
+    previous: "Kutaa duraa",
+    close: "Taphaachaa xumi",
+    mute: "Sagalee dhaqi",
+    unmute: "Sagalee banaa",
+    volume: "Sagalee",
+    seekForward: "10 seecoodii fufaatti",
+    seekBack: "10 seecoodii duubatti",
+  },
+  like: {
+    label: "Kutaa kana hajaji'i",
+    labelActive: "Hajajicha kee irra bu'i",
+    failed: "Hajajichaa hin dheeffine. Irra deebi'i.",
   },
 };

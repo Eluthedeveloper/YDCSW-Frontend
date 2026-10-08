@@ -1,6 +1,7 @@
 @import "tailwindcss" source(none);
-@source "../src";
 @import "tw-animate-css";
+
+@source "../src";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -95,6 +96,18 @@
   --gradient-gold: linear-gradient(135deg, oklch(0.78 0.14 80), oklch(0.65 0.15 60));
   --shadow-elegant: 0 20px 60px -20px oklch(0.22 0.06 260 / 0.25);
   --shadow-gold: 0 10px 40px -10px oklch(0.72 0.13 75 / 0.5);
+  /* Room the document reserves for the fixed player bar while a track is
+     loaded. Measured from the bar's own parts: the 2px progress line, the
+     18px chevron row, and the 68px cover/controls row. A little slack is
+     deliberate — over-reserving leaves a gap, under-reserving hides content. */
+  --player-bar-height: calc(5.75rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* The desktop bar is a single shorter row, so it needs less room. */
+@media (min-width: 768px) {
+  :root {
+    --player-bar-height: 5.5rem;
+  }
 }
 
 @layer base {
@@ -110,6 +123,41 @@
   h1, h2, h3, h4 {
     font-family: var(--font-serif);
     letter-spacing: -0.02em;
+  }
+
+  /**
+   * The collapsed player is `position: fixed` to the bottom of the viewport, so
+   * every page has to reserve room for it or the last rows of the footer end up
+   * underneath with no way to scroll them clear.
+   *
+   * The reservation lives here, on the document, rather than in each layout:
+   * the marketing pages and the player pages use different shells, and the bar
+   * is global chrome that survives navigation between them. AudioPlayer sets
+   * `data-player="open"` on <html> while a track is loaded.
+   *
+   * The safe-area term matters on notched phones, where the bar would otherwise
+   * sit under the home indicator and clip the controls.
+   */
+  html[data-player='open'] body {
+    padding-bottom: var(--player-bar-height);
+  }
+
+  /**
+   * Bottom padding for the player bar's own content row.
+   *
+   * Written out rather than applied as a Tailwind arbitrary value, because the
+   * comma inside `env()`'s fallback stops the class from being generated at all
+   * — the rule silently never reaches the stylesheet.
+   */
+  .player-bar-safe-pad {
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (min-width: 768px) {
+  /* Desktop has no home indicator, so it keeps the plain padding. */
+  .player-bar-safe-pad {
+    padding-bottom: 0.75rem;
   }
 }
 

@@ -1,8 +1,9 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePlayer } from '../context/PlayerContext';
+import { useTrackLike } from '../hooks/useTrackLike';
 import { uploadUrl } from '../utils/api';
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Music, ChevronDown, ChevronUp, Heart, Shuffle, Repeat, Loader2, X } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, RotateCcw, RotateCw, Volume2, VolumeX, Music, ChevronDown, ChevronUp, Heart, Shuffle, Repeat, Loader2, X, AlertTriangle } from 'lucide-react';
 import WaveSpectrum from './WaveSpectrum';
 
 function formatTime(s: number) {
@@ -35,13 +36,22 @@ function DraggableProgress({
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
+  // `dragPercent` being non-null already means "a drag is in progress", so the
+  // thumb's opacity can read from state instead of `dragging.current`, which
+  // would never re-render when the flag flipped.
   const [dragPercent, setDragPercent] = useState<number | null>(null);
+  const isDragging = dragPercent !== null;
   const rafRef = useRef<number>(0);
   const pendingSeekRef = useRef<number>(0);
+  // Mirrors of values the stable listeners below need. Written in an effect so
+  // no ref is mutated during render.
   const durationRef = useRef(duration);
-  durationRef.current = duration;
   const onSeekRef = useRef(onSeek);
-  onSeekRef.current = onSeek;
+
+  useEffect(() => {
+    durationRef.current = duration;
+    onSeekRef.current = onSeek;
+  }, [duration, onSeek]);
 
   const getPercent = useCallback((clientX: number) => {
     if (!trackRef.current) return 0;
@@ -123,7 +133,7 @@ function DraggableProgress({
       </div>
       {showThumb && (
         <div
-          className={`absolute top-1/2 -translate-y-1/2 ${thumbSize} bg-white rounded-full shadow-md transition-opacity ${dragging.current ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+          className={`absolute top-1/2 -translate-y-1/2 ${thumbSize} bg-white rounded-full shadow-md transition-opacity ${isDragging ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
           style={{ left: `calc(${percent}% - ${thumbSize.includes('3.5') ? '7px' : '6px'})` }}
         />
       )}
@@ -213,6 +223,69 @@ function DraggableVolume({
   );
 }
 
+/**
+ * The drag-only volume track, exposed as a real slider.
+ *
+ * `DraggableVolume` is pointer-only, which left the desktop control
+ * unreachable by keyboard and invisible to assistive tech. The role and value
+ * attributes go on a wrapper that also handles the arrow keys, so the control
+ * works without a pointer and announces its position.
+ */
+function VolumeSlider({
+  value,
+  onChange,
+  label,
+  className = '',
+}: {
+  value: number;
+  onChange: (vol: number) => void;
+  label: string;
+  className?: string;
+}) {
+  const clamp = (v: number) => Math.max(0, Math.min(1, v));
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    const stepSize = e.shiftKey ? 0.1 : 0.02;
+    const apply = (v: number) => {
+      e.preventDefault();
+      onChange(clamp(v));
+    };
+
+    switch (e.key) {
+      case 'ArrowRight':
+      case 'ArrowUp':
+        apply(value + stepSize);
+        return;
+      case 'ArrowLeft':
+      case 'ArrowDown':
+        apply(value - stepSize);
+        return;
+      case 'Home':
+        apply(0);
+        return;
+      case 'End':
+        apply(1);
+        return;
+      default:
+    }
+  };
+
+  return (
+    <div
+      role="slider"
+      tabIndex={0}
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(value * 100)}
+      onKeyDown={handleKeyDown}
+      className={`flex-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 rounded-full ${className}`}
+    >
+      <DraggableVolume value={value} onChange={onChange} className="w-full" />
+    </div>
+  );
+}
+
 function CoverArt({ src, size, className = '' }: { src?: string; size: string; className?: string }) {
   const [failed, setFailed] = useState(false);
 
@@ -231,21 +304,44 @@ function CoverArt({ src, size, className = '' }: { src?: string; size: string; c
 }
 
 export default function AudioPlayer() {
-  const { currentTrack, isPlaying, isBuffering, volume, progress, duration, pause, resume, seek, startSeeking, endSeeking, setVolume, next, prev, close } = usePlayer();
+  const {
+    currentTrack, isPlaying, isBuffering, volume, progress, duration,
+    pause, resume, seek, startSeeking, endSeeking, setVolume, next, prev, close,
+    skipForward, skipBack,
+    shuffle, repeatMode, toggleShuffle, cycleRepeat,
+    playbackError, dismissPlaybackError,
+  } = usePlayer();
   const { t } = useTranslation('programs');
   const [muted, setMuted] = useState(false);
   const [prevVolume, setPrevVolume] = useState(0.8);
   const [expanded, setExpanded] = useState(false);
-  const [liked, setLiked] = useState(false);
-  const [shuffled, setShuffled] = useState(false);
-  const [repeatMode, setRepeatMode] = useState(0);
 
   const touchStartY = useRef(0);
   const isDragging = useRef(false);
 
+  // The bar is fixed to the viewport, so the document needs to reserve room for
+  // it while it is on screen. Flagging <html> keeps that in one place: the
+  // marketing pages and the player pages use different shells, and the bar
+  // outlives navigation between them. Without this the footer sits underneath
+  // the bar with no way to scroll it clear.
+  useEffect(() => {
+    if (!currentTrack) return;
+    document.documentElement.dataset.player = 'open';
+    return () => { delete document.documentElement.dataset.player; };
+  }, [currentTrack]);
+
+  // The like lives in the context so the full-screen view and the desktop bar
+  // show one heart, not two that can disagree.
+  const { liked, toggle: toggleLike } = useTrackLike(currentTrack?.id);
+
   const toggleMute = () => {
     if (muted) { setVolume(prevVolume); setMuted(false); }
     else { setPrevVolume(volume); setVolume(0); setMuted(true); }
+  };
+
+  const retry = () => {
+    dismissPlaybackError();
+    if (currentTrack) resume();
   };
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -282,7 +378,7 @@ export default function AudioPlayer() {
     return null;
   }
 
-  const coverSrc = (currentTrack as any).program_cover;
+  const coverSrc = currentTrack.program_cover ?? undefined;
 
   return (
     <>
@@ -327,11 +423,23 @@ export default function AudioPlayer() {
                   {isBuffering && <Loader2 size={12} className="animate-spin text-primary-400" />}
                 </p>
               </div>
-              <button onClick={() => setLiked(!liked)}
+              <button onClick={toggleLike}
+                aria-pressed={liked}
+                aria-label={liked ? t('like.labelActive') : t('like.label')}
                 className={`p-2 rounded-full transition-all ${liked ? 'text-red-400' : 'text-white/40 hover:text-white'}`}>
                 <Heart size={22} fill={liked ? 'currentColor' : 'none'} />
               </button>
             </div>
+
+            {playbackError && (
+              <div role="alert" className="mb-4 flex items-center gap-3 rounded-xl bg-red-500/15 px-4 py-3">
+                <AlertTriangle size={18} className="flex-shrink-0 text-red-400" />
+                <p className="flex-1 text-xs text-white/80">{t(`playbackError.${playbackError}`)}</p>
+                <button onClick={retry} className="flex-shrink-0 text-xs font-semibold text-white underline">
+                  {t('playbackError.retry')}
+                </button>
+              </div>
+            )}
 
             <div className="mb-4">
               <DraggableProgress
@@ -350,33 +458,48 @@ export default function AudioPlayer() {
             </div>
 
             <div className="flex items-center justify-between mb-6">
-              <button onClick={() => setShuffled(!shuffled)}
-                className={`p-2 rounded-full transition-all ${shuffled ? 'text-primary-400' : 'text-white/40 hover:text-white'}`}>
+              <button onClick={toggleShuffle}
+                aria-pressed={shuffle}
+                aria-label={t('shuffle.label')}
+                className={`p-2 rounded-full transition-all ${shuffle ? 'text-primary-400' : 'text-white/40 hover:text-white'}`}>
                 <Shuffle size={20} />
               </button>
-              <button onClick={prev}
-                className="p-2 text-white hover:scale-105 active:scale-95 transition-transform">
+              <button onClick={prev} aria-label={t('controls.previous')} className="p-2 text-white hover:scale-105 active:scale-95 transition-transform">
                 <SkipBack size={28} fill="currentColor" />
               </button>
-              <button onClick={() => isPlaying ? pause() : resume()}
-                className="w-16 h-16 rounded-full bg-white flex items-center justify-center text-black hover:scale-105 active:scale-95 transition-transform shadow-xl">
+              <button onClick={() => isPlaying ? pause() : resume()} aria-label={isPlaying ? t('controls.pause') : t('controls.play')} className="w-16 h-16 rounded-full bg-white flex items-center justify-center text-black hover:scale-105 active:scale-95 transition-transform shadow-xl">
                 {isBuffering ? <Loader2 size={30} className="animate-spin" /> : isPlaying ? <Pause size={30} fill="currentColor" /> : <Play size={30} fill="currentColor" className="ml-1" />}
               </button>
-              <button onClick={next}
-                className="p-2 text-white hover:scale-105 active:scale-95 transition-transform">
+              <button onClick={next} aria-label={t('controls.next')} className="p-2 text-white hover:scale-105 active:scale-95 transition-transform">
                 <SkipForward size={28} fill="currentColor" />
               </button>
-              <button onClick={() => setRepeatMode((repeatMode + 1) % 3)}
-                className={`p-2 rounded-full transition-all ${repeatMode > 0 ? 'text-primary-400' : 'text-white/40 hover:text-white'}`}>
+              <button onClick={cycleRepeat}
+                aria-label={t(`repeat.label.${repeatMode}`)}
+                className={`p-2 rounded-full transition-all ${repeatMode !== 'off' ? 'text-primary-400' : 'text-white/40 hover:text-white'}`}>
                 <Repeat size={20} />
+                {repeatMode === 'one' && (
+                  <span className="absolute mt-3.5 ml-3.5 text-[8px] font-bold leading-none">1</span>
+                )}
+              </button>
+            </div>
+
+            <div className="flex items-center justify-center gap-8 -mt-3">
+              <button onClick={() => skipBack()} aria-label={t('controls.seekBack')} className="flex items-center gap-0.5 text-white/50 hover:text-white transition-colors">
+                <RotateCcw size={20} />
+                <span className="text-[10px] font-bold leading-none">10</span>
+              </button>
+              <button onClick={() => skipForward()} aria-label={t('controls.seekForward')} className="flex items-center gap-0.5 text-white/50 hover:text-white transition-colors">
+                <span className="text-[10px] font-bold leading-none">10</span>
+                <RotateCw size={20} />
               </button>
             </div>
 
             <div className="flex items-center gap-3">
-              <button onClick={toggleMute} className="text-white/40 hover:text-white transition-colors">
+              <button onClick={toggleMute} aria-label={muted || volume === 0 ? t('controls.unmute') : t('controls.mute')} className="text-white/40 hover:text-white transition-colors">
                 {muted || volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
               </button>
               <input type="range" min={0} max={1} step={0.01} value={muted ? 0 : volume}
+                aria-label={t('controls.volume')}
                 onChange={(e) => { setVolume(parseFloat(e.target.value)); setMuted(false); }}
                 className="flex-1 h-1 accent-white" />
             </div>
@@ -402,7 +525,7 @@ export default function AudioPlayer() {
             <ChevronUp size={14} className="dark:text-dark-400 text-dark-500" />
           </div>
 
-          <div className="px-4 py-3 flex items-center gap-3">
+          <div className="px-4 py-3 player-bar-safe-pad flex items-center gap-3">
             <CoverArt src={coverSrc} size="w-11 h-11" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold dark:text-white text-dark-900 truncate leading-tight">{currentTrack.title}</p>
@@ -412,20 +535,20 @@ export default function AudioPlayer() {
               </p>
             </div>
             <div className="flex items-center gap-1">
-              <button onClick={(e) => { e.stopPropagation(); prev(); }}
+              <button onClick={(e) => { e.stopPropagation(); prev(); }} aria-label={t('controls.previous')}
                 className="p-2 dark:text-dark-200 text-dark-600 active:scale-90 transition-transform">
                 <SkipBack size={18} fill="currentColor" />
               </button>
-              <button onClick={(e) => { e.stopPropagation(); isPlaying ? pause() : resume(); }}
+              <button onClick={(e) => { e.stopPropagation(); if (isPlaying) pause(); else resume(); }} aria-label={isPlaying ? t('controls.pause') : t('controls.play')}
                 className="w-10 h-10 rounded-full bg-primary-600 flex items-center justify-center text-white shadow-lg shadow-primary-600/30 active:scale-90 transition-transform">
                 {isBuffering ? <Loader2 size={18} className="animate-spin" /> : isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-0.5" />}
               </button>
-              <button onClick={(e) => { e.stopPropagation(); next(); }}
+              <button onClick={(e) => { e.stopPropagation(); next(); }} aria-label={t('controls.next')}
                 className="p-2 dark:text-dark-200 text-dark-600 active:scale-90 transition-transform">
                 <SkipForward size={18} fill="currentColor" />
               </button>
               <div className="w-px h-5 dark:bg-white/10 bg-dark-300" />
-              <button onClick={(e) => { e.stopPropagation(); close(); }}
+              <button onClick={(e) => { e.stopPropagation(); close(); }} aria-label={t('controls.close')}
                 className="p-2 dark:text-dark-300 text-dark-500 dark:hover:text-red-400 hover:text-red-500 active:scale-90 transition-all">
                 <X size={16} />
               </button>
@@ -445,7 +568,9 @@ export default function AudioPlayer() {
                   {isBuffering && <Loader2 size={10} className="animate-spin text-primary-400" />}
                 </p>
               </div>
-              <button onClick={() => setLiked(!liked)}
+              <button onClick={toggleLike}
+                aria-pressed={liked}
+                aria-label={liked ? t('like.labelActive') : t('like.label')}
                 className={`p-1.5 rounded-full transition-all flex-shrink-0 ${liked ? 'text-red-400' : 'dark:text-dark-300 text-dark-500 hover:text-red-400'}`}>
                 <Heart size={16} fill={liked ? 'currentColor' : 'none'} />
               </button>
@@ -453,25 +578,39 @@ export default function AudioPlayer() {
 
             <div className="flex-1 max-w-xl">
               <div className="flex items-center justify-center gap-4 mb-1.5">
-                <button onClick={() => setShuffled(!shuffled)}
-                  className={`p-1.5 rounded-full transition-all ${shuffled ? 'text-primary-400' : 'dark:text-dark-300 text-dark-500 hover:text-primary-400'}`}>
+                <button onClick={toggleShuffle}
+                  aria-pressed={shuffle}
+                  aria-label={t('shuffle.label')}
+                  className={`p-1.5 rounded-full transition-all ${shuffle ? 'text-primary-400' : 'dark:text-dark-300 text-dark-500 hover:text-primary-400'}`}>
                   <Shuffle size={15} />
                 </button>
-                <button onClick={prev}
+                <button onClick={prev} aria-label={t('controls.previous')}
                   className="p-1.5 rounded-full dark:text-dark-100 text-dark-700 dark:hover:text-white hover:text-dark-900 hover:scale-105 active:scale-95 transition-all">
                   <SkipBack size={18} fill="currentColor" />
                 </button>
-                <button onClick={() => isPlaying ? pause() : resume()}
+                <button onClick={() => isPlaying ? pause() : resume()} aria-label={isPlaying ? t('controls.pause') : t('controls.play')}
                   className="w-9 h-9 rounded-full bg-primary-600 hover:bg-primary-700 flex items-center justify-center text-white shadow-lg shadow-primary-600/25 hover:scale-105 active:scale-95 transition-all">
                   {isBuffering ? <Loader2 size={16} className="animate-spin" /> : isPlaying ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" className="ml-0.5" />}
                 </button>
-                <button onClick={next}
+                <button onClick={next} aria-label={t('controls.next')}
                   className="p-1.5 rounded-full dark:text-dark-100 text-dark-700 dark:hover:text-white hover:text-dark-900 hover:scale-105 active:scale-95 transition-all">
                   <SkipForward size={18} fill="currentColor" />
                 </button>
-                <button onClick={() => setRepeatMode((repeatMode + 1) % 3)}
-                  className={`p-1.5 rounded-full transition-all ${repeatMode > 0 ? 'text-primary-400' : 'dark:text-dark-300 text-dark-500 hover:text-primary-400'}`}>
+                <button onClick={cycleRepeat}
+                  aria-label={t(`repeat.label.${repeatMode}`)}
+                  className={`relative p-1.5 rounded-full transition-all ${repeatMode !== 'off' ? 'text-primary-400' : 'dark:text-dark-300 text-dark-500 hover:text-primary-400'}`}>
                   <Repeat size={15} />
+                  {repeatMode === 'one' && (
+                    <span className="absolute -bottom-0.5 -right-0.5 text-[7px] font-bold leading-none">1</span>
+                  )}
+                </button>
+                <button onClick={() => skipBack()} aria-label={t('controls.seekBack')}
+                  className="p-1.5 rounded-full dark:text-dark-300 text-dark-500 dark:hover:text-white hover:text-dark-900 transition-colors">
+                  <RotateCcw size={14} />
+                </button>
+                <button onClick={() => skipForward()} aria-label={t('controls.seekForward')}
+                  className="p-1.5 rounded-full dark:text-dark-300 text-dark-500 dark:hover:text-white hover:text-dark-900 transition-colors">
+                  <RotateCw size={14} />
                 </button>
               </div>
               <div className="flex items-center gap-3">
@@ -490,17 +629,17 @@ export default function AudioPlayer() {
             </div>
 
             <div className="flex items-center gap-2 w-36">
-              <button onClick={toggleMute} className="p-1.5 dark:text-dark-100 text-dark-700 dark:hover:text-white hover:text-dark-900 transition-colors">
+              <button onClick={toggleMute} aria-label={muted || volume === 0 ? t('controls.unmute') : t('controls.mute')} className="p-1.5 dark:text-dark-100 text-dark-700 dark:hover:text-white hover:text-dark-900 transition-colors">
                 {muted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
               </button>
-              <DraggableVolume
+              <VolumeSlider
                 value={muted ? 0 : volume}
+                label={t('controls.volume')}
                 onChange={(v) => { setVolume(v); setMuted(false); }}
-                className="flex-1"
               />
             </div>
             <div className="w-px h-6 dark:bg-white/10 bg-dark-300 flex-shrink-0" />
-            <button onClick={close}
+            <button onClick={close} aria-label={t('controls.close')}
               className="p-2 dark:text-dark-300 text-dark-500 dark:hover:text-red-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all flex-shrink-0">
               <X size={16} />
             </button>

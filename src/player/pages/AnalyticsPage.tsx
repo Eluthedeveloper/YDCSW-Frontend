@@ -1,23 +1,10 @@
 import { useState, useEffect } from 'react';
 import { api } from '../utils/api';
+import type { Analytics } from '../utils/api';
 import { BarChart3, Users, Music, FolderOpen, MessageCircle, Heart, TrendingUp, Headphones } from 'lucide-react';
 
-interface AnalyticsData {
-  totals: { programs: number; tracks: number; users: number; comments: number; likes: number; listens: number; listeners: number };
-  programsByUser: any[];
-  tracksByType: any[];
-  tracksByProgram: any[];
-  mostLikedTracks: any[];
-  recentComments: any[];
-  programsByMonth: any[];
-  tracksByMonth: any[];
-  listensByMonth: any[];
-  listenersByMonth: any[];
-  commentsByMonth: any[];
-}
-
 export default function AnalyticsPage() {
-  const [data, setData] = useState<AnalyticsData | null>(null);
+  const [data, setData] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -117,7 +104,7 @@ export default function AnalyticsPage() {
           ) : (
             <div className="space-y-3">
               {data.listenersByMonth.map((m) => {
-                const maxCount = Math.max(...data.listenersByMonth.map((x: any) => x.count), 1);
+                const maxCount = Math.max(...data.listenersByMonth.map((x) => x.count), 1);
                 return (
                   <div key={m.month}>
                     <div className="flex items-center justify-between mb-1">
@@ -145,7 +132,7 @@ export default function AnalyticsPage() {
           ) : (
             <div className="space-y-3">
               {data.commentsByMonth.map((m) => {
-                const maxCount = Math.max(...data.commentsByMonth.map((x: any) => x.count), 1);
+                const maxCount = Math.max(...data.commentsByMonth.map((x) => x.count), 1);
                 return (
                   <div key={m.month}>
                     <div className="flex items-center justify-between mb-1">
@@ -188,7 +175,7 @@ export default function AnalyticsPage() {
                       <span className="text-xs dark:text-dark-300 text-dark-500">{t.count} ({Math.round((t.count / total) * 100)}%)</span>
                     </div>
                     <div className="h-2 dark:bg-dark-600 bg-light-200 rounded-full overflow-hidden">
-                      <div className={`h-full bg-gradient-to-r ${colors[t.track_type] || 'from-gray-500 to-gray-400'} rounded-full`}
+                      <div className={`h-full bg-gradient-to-r ${colors[t.track_type ?? ''] || 'from-gray-500 to-gray-400'} rounded-full`}
                         style={{ width: `${(t.count / total) * 100}%` }} />
                     </div>
                   </div>

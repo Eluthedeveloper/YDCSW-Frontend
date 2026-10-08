@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { usePlayer } from '../context/PlayerContext';
+import type { Program, Track } from '../utils/types';
 import { api } from '../utils/api';
+import { useAsyncData } from '../hooks/useAsyncData';
+import LoadError from '../components/LoadError';
 import CoverBg from '../components/CoverBg';
 import CoverImg from '../components/CoverImg';
 import { Play, Pause, Music, TrendingUp, Headphones } from 'lucide-react';
@@ -12,15 +14,16 @@ export default function PublicHomePage() {
   const navigate = useNavigate();
   const onViewProgram = (id: string) => navigate(`/programs/${id}`);
   const { play, pause, resume, currentTrack, isPlaying } = usePlayer();
-  const [programs, setPrograms] = useState<any[]>([]);
-  const [latestTracks, setLatestTracks] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    Promise.all([api.getPublicPrograms(), api.getLatestTracks()])
-      .then(([p, t]) => { setPrograms(p); setLatestTracks(t); })
-      .finally(() => setLoading(false));
-  }, []);
+  const {
+    data: { programs, latestTracks },
+    loading,
+    error,
+    reload,
+  } = useAsyncData(
+    () => Promise.all([api.getPublicPrograms(), api.getLatestTracks()]).then(([p, t]) => ({ programs: p, latestTracks: t })),
+    { programs: [] as Program[], latestTracks: [] as Track[] }
+  );
 
   if (loading) {
     return (
@@ -28,6 +31,10 @@ export default function PublicHomePage() {
         {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="glass-panel rounded-2xl h-72 animate-pulse" />)}
       </div>
     );
+  }
+
+  if (error) {
+    return <LoadError error={error} onRetry={reload} />;
   }
 
   return (

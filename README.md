@@ -1,73 +1,78 @@
-# React + TypeScript + Vite
+# EthioGospel frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + TypeScript + Vite single-page app for the streaming site, including the
+public player and the admin console.
 
-Currently, two official plugins are available:
+## Scripts
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Dev server with hot reload |
+| `npm run build` | Typecheck, then emit a production bundle into `dist/` |
+| `npm run typecheck` | `tsc -b` over the app and node projects |
+| `npm run lint` | ESLint over the whole source tree |
+| `npm test` | Vitest suite in jsdom |
+| `npm run test:watch` | Vitest in watch mode |
+| `npm run test:coverage` | Vitest with coverage |
 
-## React Compiler
+Run `npm run lint` and `npx eslint . --fix` before pushing; the suite is
+expected to be clean.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Authentication
 
-## Expanding the ESLint configuration
+Login returns an httpOnly cookie named `ydcs_session`. Nothing sensitive is
+stored in the browser:
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- `frontend/src/player/utils/api.ts` sends `credentials: 'include'` on every request.
+- No `Authorization` header is set by the browser client.
+- The only `localStorage` entry is `audio_client_id`, a random anonymous
+  identifier used for listener identity (likes and listens).
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+`AuthContext` calls `getMe()` on mount to restore the session and exposes
+`isChecking` so the app can hold its splash screen until that check settles.
+On logout the context clears in-memory state and the server clears the cookie.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+The backend still accepts `Authorization: Bearer` for non-browser clients.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Configuration
+
+`VITE_API_URL` sets the API base path.
+
+- Local development defaults to `http://localhost:7000/api`.
+- Docker builds it with `VITE_API_URL=/api` so the browser and API share an
+  origin through the nginx reverse proxy. That keeps the session cookie
+  first-party, which is what allows `SameSite=Lax` to work.
+
+For a split deployment, set `VITE_API_URL=https://api.example.com/api` at build
+time and add the frontend origin to the backend CORS allowlist in
+`backend/src/index.ts`.
+
+Production must be served over HTTPS. The session cookie is marked `secure`
+when the backend runs with `NODE_ENV=production`, and browsers drop `secure`
+cookies received over plain HTTP, so an HTTP-only production host means nobody
+can log in.
+
+## Layout
+
+```
+src/
+  components/          shared chrome: Nav, Footer, ErrorBoundary, admin console
+  i18n.tsx             i18next bootstrap
+  i18n/locales/        en / am / om translation data
+  lib/apiBase.ts       VITE_API_URL resolution
+  player/              the player feature: pages, context, hooks, utils
+  shims/              browser stubs for packages with native-only imports
+  test/setup.ts       shared jsdom and media-element stubs
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Notes
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+- `jsmediatags` requires `react-native-fs` at module scope. `vite.config.ts`
+  aliases it to `src/shims/react-native-fs.ts`; the browser build never uses the
+  React Native reader.
+- Tailwind runs through the `@tailwindcss/vite` plugin. Keep `@import` rules
+  ahead of `@source` in `src/index.css`, otherwise the CSS minifier rejects the
+  `source()` function.
+- The production bundle emits a chunk-size warning for the main entry. It is
+  not an error; code-splitting the routes would address it if bundle size
+  becomes a problem.

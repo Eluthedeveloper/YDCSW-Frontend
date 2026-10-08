@@ -19,4 +19,14 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // Context providers necessarily export their matching hook alongside the
+    // component. Splitting them into two files would force every consumer to
+    // import from two places and would not change how fast refresh behaves,
+    // since the hook holds no component state of its own.
+    files: ['**/context/*.tsx'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 ])

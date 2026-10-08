@@ -1,3 +1,11 @@
+# Apache equivalent of the nginx.conf security headers, for deployments that
+# serve the built `dist/` on shared hosting instead of the nginx container.
+# Both paths need these: a CSP only protects anyone if the server that actually
+# returns the HTML sets it.
+
+# ---------------------------------------------------------------------------
+# SPA routing
+# ---------------------------------------------------------------------------
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteBase /
@@ -9,4 +17,55 @@
     RewriteCond %{REQUEST_FILENAME} !-l
 
     RewriteRule ^.*$ /index.html [L]
+</IfModule>
+
+# ---------------------------------------------------------------------------
+# Security headers
+#
+# Kept in step with nginx.conf. script-src has no 'unsafe-inline' because Vite
+# emits external module scripts and index.html has no inline script.
+# style-src needs it: ~20 components pass a `style` prop, which is an inline
+# style attribute rather than a stylesheet.
+# ---------------------------------------------------------------------------
+<IfModule mod_headers.c>
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' blob:; connect-src 'self'; frame-src https://embed.clrd.net https://www.google.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+    # Legacy fallback for the clickjacking protection frame-ancestors already
+    # provides in every current browser.
+    Header always set X-Frame-Options "SAMEORIGIN"
+
+    Header always set Permissions-Policy "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
+
+    # HSTS is ignored by browsers unless it arrives over HTTPS, and sending it
+    # over plain HTTP achieves nothing. Guarding on the scheme keeps a visitor
+    # who lands on the http:// origin from being pinned to a scheme that cannot
+    # serve them, which is how a site ends up unreachable over http.
+    <If "%{HTTPS} == 'on'">
+        Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    </If>
+
+    # The entry document must never be cached, or a deploy keeps serving the
+    # previous build's hashed filenames until the cache expires. mod_expires
+    # below only manages the other types.
+    <Files "index.html">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+    </Files>
+</IfModule>
+
+# ---------------------------------------------------------------------------
+# Caching
+# ---------------------------------------------------------------------------
+<IfModule mod_expires.c>
+    ExpiresActive On
+
+    # Hashed build output. A content change produces a new filename, so a
+    # cached entry can never be stale.
+    ExpiresByType text/css "access plus 1 year"
+    ExpiresByType application/javascript "access plus 1 year"
+    ExpiresByType text/javascript "access plus 1 year"
+    ExpiresByType image/svg+xml "access plus 1 year"
+    ExpiresByType font/woff2 "access plus 1 year"
 </IfModule>

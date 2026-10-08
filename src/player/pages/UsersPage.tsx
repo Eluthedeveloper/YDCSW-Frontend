@@ -1,36 +1,47 @@
-import { useState, useEffect } from 'react';
+import { errorMessage } from '../utils/errors';
+import { useState, useEffect, useCallback } from 'react';
 import { api } from '../utils/api';
 import { usePlayerAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
 import { Plus, Trash2, X, Loader2, Shield, ShieldCheck, KeyRound, Eye, EyeOff } from 'lucide-react';
-
-interface User {
-  id: string;
-  username: string;
-  email: string;
-  role: 'super_admin' | 'admin';
-  created_at: string;
-}
+import type { CreateUserInput, UserRow } from '../utils/types';
 
 export default function UsersPage() {
   const { isSuperAdmin, user: currentUser } = usePlayerAuth();
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ username: '', email: '', password: '', role: 'admin' });
-  const [resetUser, setResetUser] = useState<User | null>(null);
+  const [form, setForm] = useState<CreateUserInput>({ username: '', email: '', password: '', role: 'admin' });
+  const [resetUser, setResetUser] = useState<UserRow | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [resetting, setResetting] = useState(false);
 
-  useEffect(() => { loadUsers(); }, []);
+  const loadUsers = useCallback(async () => {
+    const data = await api.getUsers();
+    setUsers(data);
+  }, []);
 
-  const loadUsers = async () => {
-    try {
-      const data = await api.getUsers();
-      setUsers(data);
-    } finally { setLoading(false); }
+  useEffect(() => {
+    let mounted = true;
+    const initial = async () => {
+      try {
+        await loadUsers();
+      } catch (err) {
+        toast.error(errorMessage(err, 'Failed to load users'));
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    initial();
+    return () => {
+      mounted = false;
+    };
+  }, [loadUsers]);
+
+  const refresh = () => {
+    loadUsers().catch((err: unknown) => toast.error(errorMessage(err, 'Failed to load users')));
   };
 
   const createUser = async (e: React.FormEvent) => {
@@ -40,10 +51,10 @@ export default function UsersPage() {
       await api.createUser(form);
       setShowCreate(false);
       setForm({ username: '', email: '', password: '', role: 'admin' });
-      loadUsers();
+      refresh();
       toast.success('User created');
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to create user');
+    } catch (err: unknown) {
+      toast.error(errorMessage(err, 'Failed to create user'));
     } finally { setCreating(false); }
   };
 
@@ -54,10 +65,10 @@ export default function UsersPage() {
         onClick: async () => {
           try {
             await api.deleteUser(id);
-            loadUsers();
+            refresh();
             toast.success('User deleted');
-          } catch (err: any) {
-            toast.error(err.message || 'Failed to delete');
+          } catch (err: unknown) {
+            toast.error(errorMessage(err, 'Failed to delete'));
           }
         },
       },
@@ -74,8 +85,8 @@ export default function UsersPage() {
       setResetUser(null);
       setNewPassword('');
       toast.success('Password updated');
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to update password');
+    } catch (err: unknown) {
+      toast.error(errorMessage(err, 'Failed to update password'));
     } finally { setResetting(false); }
   };
 
@@ -178,7 +189,7 @@ export default function UsersPage() {
               </div>
               <div className="mb-6">
                 <label className="block text-xs font-medium dark:text-dark-100 text-dark-700 mb-1.5">Role</label>
-                <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}
+                <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as CreateUserInput['role'] })}
                   className="w-full px-4 py-3 dark:bg-dark-600 bg-white border dark:border-white/5 border-dark-300 rounded-lg dark:text-white text-dark-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600">
                   <option value="admin">Admin</option>
                   <option value="super_admin">Super Admin</option>

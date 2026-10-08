@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import type { Program } from '../utils/types';
 import { api } from '../utils/api';
+import { useAsyncData } from '../hooks/useAsyncData';
+import LoadError from '../components/LoadError';
 import CoverBg from '../components/CoverBg';
 import { Music, Heart, MessageCircle, Clock } from 'lucide-react';
 
@@ -9,10 +11,15 @@ export default function PublicProgramsPage() {
   const { t } = useTranslation('programs');
   const navigate = useNavigate();
   const onViewProgram = (id: string) => navigate(`/programs/${id}`);
-  const [programs, setPrograms] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => { api.getPublicPrograms().then(setPrograms).finally(() => setLoading(false)); }, []);
+  const { data: programs, loading, error, reload } = useAsyncData<Program[]>(
+    () => api.getPublicPrograms(),
+    []
+  );
+
+  if (error) {
+    return <LoadError error={error} onRetry={reload} />;
+  }
 
   return (
     <div>

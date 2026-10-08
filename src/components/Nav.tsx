@@ -28,9 +28,25 @@ export function Nav(): React.ReactElement {
       if (!target.closest("[data-about-dropdown]")) setAboutOpen(false);
       if (!target.closest("[data-dept-dropdown]")) setDeptOpen(false);
     };
+    // Escape closes an open dropdown. It only had an outside-click handler, so a
+    // keyboard user who opened one with Enter had no way to dismiss it without
+    // tabbing out of the document.
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setAboutOpen(false);
+      setDeptOpen(false);
+      setMobileAboutOpen(false);
+      setMobileDeptOpen(false);
+    };
     if (aboutOpen || deptOpen) document.addEventListener("click", onClick);
-    return () => document.removeEventListener("click", onClick);
-  }, [aboutOpen, deptOpen]);
+    if (aboutOpen || deptOpen || mobileAboutOpen || mobileDeptOpen) {
+      document.addEventListener("keydown", onKeyDown);
+    }
+    return () => {
+      document.removeEventListener("click", onClick);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [aboutOpen, deptOpen, mobileAboutOpen, mobileDeptOpen]);
 
   // Lock body scroll when mobile menu is open
   useEffect(() => {
@@ -65,12 +81,14 @@ export function Nav(): React.ReactElement {
     { to: "/divisions", label: t("nav.allDivisions") },
     { to: "/divisions/electronic-media", label: t("nav.electronicMedia") },
     { to: "/divisions/print-media", label: t("nav.printMedia") },
-    { to: "/divisions/vestment-bookstore", label: t("nav.vestmentBookstore") },
     { to: "/divisions/finance", label: t("nav.finance") },
     { to: "/divisions/resource-mobilization", label: t("nav.resource") },
   ];
 
-  const LanguageButtons = () => (
+  // Built as a plain element rather than a nested component: it needs this
+  // component's i18n instance, and defining it at module scope would mean
+  // threading that state down through props.
+  const languageButtons = (
     <div className="flex items-center gap-1">
       {["am", "en", "om"].map((lng) => (
         <button
@@ -104,7 +122,7 @@ export function Nav(): React.ReactElement {
           />
           <div className="flex flex-col leading-tight">
             <span className="font-display text-base font-bold tracking-tight text-background transition-colors group-hover:text-gold">
-              Yemisrach Dimts Media
+              Yemisrach Dimts
             </span>
             <span className="font-display text-[10px] font-medium tracking-wide text-gold/80">
               Ethiopian Evangelical Church Mekane Yesus
@@ -131,6 +149,8 @@ export function Nav(): React.ReactElement {
           <li className="relative" data-about-dropdown>
             <button
               onClick={() => setAboutOpen((p) => !p)}
+              aria-expanded={aboutOpen}
+              aria-haspopup="true"
               className={`flex items-center gap-1 transition hover:text-gold ${
                 pathname === "/about" || aboutOpen ? "text-gold" : ""
               }`}
@@ -185,6 +205,8 @@ export function Nav(): React.ReactElement {
           <li className="relative" data-dept-dropdown>
             <button
               onClick={() => setDeptOpen((p) => !p)}
+              aria-expanded={deptOpen}
+              aria-haspopup="true"
               className={`flex items-center gap-1 transition hover:text-gold ${
                 deptOpen ? "text-gold" : ""
               }`}
@@ -240,11 +262,11 @@ export function Nav(): React.ReactElement {
           </Link>
 
           <div className="hidden lg:block">
-            <LanguageButtons />
+            {languageButtons}
           </div>
 
           <div className="lg:hidden">
-            <LanguageButtons />
+            {languageButtons}
           </div>
 
           <button
@@ -319,6 +341,8 @@ export function Nav(): React.ReactElement {
               <div className="mt-0.5">
                 <button
                   onClick={() => setMobileAboutOpen((p) => !p)}
+                  aria-expanded={mobileAboutOpen}
+                  aria-haspopup="true"
                   className={`flex w-full items-center justify-between rounded-lg px-4 py-2.5 text-sm font-medium transition hover:bg-gold/10 hover:text-gold ${
                     mobileAboutOpen ? "text-gold" : "text-background/80"
                   }`}
@@ -385,6 +409,8 @@ export function Nav(): React.ReactElement {
               <div className="mt-0.5">
                 <button
                   onClick={() => setMobileDeptOpen((p) => !p)}
+                  aria-expanded={mobileDeptOpen}
+                  aria-haspopup="true"
                   className={`flex w-full items-center justify-between rounded-lg px-4 py-2.5 text-sm font-medium transition hover:bg-gold/10 hover:text-gold ${
                     mobileDeptOpen ? "text-gold" : "text-background/80"
                   }`}

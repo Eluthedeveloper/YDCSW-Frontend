@@ -6,10 +6,9 @@ import ThemeToggle from './ThemeToggle';
 
 interface SidebarProps {
   activePage: string;
-  onNavigate: (page: string) => void;
 }
 
-export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
+export default function Sidebar({ activePage }: SidebarProps) {
   const { user, logout } = usePlayerAuth();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
@@ -26,8 +25,10 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
     ] : []),
   ];
 
+  // Navigating rather than setting local state keeps the address bar in step
+  // with the visible section, so deep links and back/forward behave.
   const handleNavigate = (id: string) => {
-    onNavigate(id);
+    navigate(`/admin/player/${id}`);
     setMobileOpen(false);
   };
 

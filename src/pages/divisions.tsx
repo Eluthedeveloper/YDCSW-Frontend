@@ -31,7 +31,10 @@ export function DivisionsPage(): React.ReactElement {
       duties: t("divisions.cards.print.duties", { returnObjects: true }) as string[],
     },
     {
-      to: "/divisions/vestment-bookstore" as const,
+      // The vestment/bookstore division has no page of its own; /bookshops is the
+// page that carries its locations. Pointing at the old
+// /divisions/vestment-bookstore hit the (previously missing) catch-all.
+to: "/bookshops" as const,
       title: t("divisions.cards.vestment.title"),
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-8 w-8">

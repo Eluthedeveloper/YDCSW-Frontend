@@ -29,14 +29,16 @@ export default function PublicLayout({ children }: Props) {
   };
 
   return (
-    <div className="min-h-screen pb-20">
+    <div className="min-h-screen">
       <header className="glass-panel border-b sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 h-18 flex items-center justify-between">
           <div className="flex items-center gap-8">
-            <button onClick={() => navigate('/')}
-              className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium dark:text-dark-200 text-dark-600 hover:text-primary-400 dark:hover:bg-dark-500/50 hover:bg-light-300/50 transition-all border dark:border-white/10 border-dark-300">
-              <ArrowLeft size={14} />
-              {t('publicNav.homepage')}
+            <button onClick={() => navigate('/')} title={t('publicNav.backHome')}
+              className="group hidden md:flex items-center gap-2 py-1 pl-1 pr-3.5 rounded-full text-xs font-medium tracking-wide transition-all border dark:border-white/10 dark:hover:border-primary-600/40 border-dark-300 hover:border-primary-400/60 dark:text-dark-300 dark:hover:text-white hover:text-dark-900 dark:hover:bg-dark-500/40 hover:bg-light-300/50">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary-600/10 text-primary-400 transition-transform duration-200 group-hover:-translate-x-0.5">
+                <ArrowLeft size={13} />
+              </span>
+              {t('publicNav.backHome')}
             </button>
             <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/programs')}>
               <img src="/logo.png" alt="Logo" className="w-11 h-11 rounded-xl object-contain shadow-lg shadow-primary-600/25" />
@@ -70,9 +72,11 @@ export default function PublicLayout({ children }: Props) {
         {mobileOpen && (
           <div className="md:hidden border-t p-3 space-y-1">
             <button onClick={() => { navigate('/'); setMobileOpen(false); }}
-              className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium dark:text-dark-200 text-dark-600 dark:hover:bg-dark-500/50 hover:bg-light-300/50 border dark:border-white/10 border-dark-300">
-              <ArrowLeft size={16} />
-              {t('publicNav.homepage')}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium dark:text-dark-200 text-dark-600 dark:hover:text-white hover:text-dark-900 dark:hover:bg-dark-500/50 hover:bg-light-300/50 border dark:border-white/10 dark:hover:border-primary-600/40 border-dark-300 transition-colors">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary-600/10 text-primary-400 flex-shrink-0">
+                <ArrowLeft size={14} />
+              </span>
+              {t('publicNav.backHome')}
             </button>
             {navItems.map((item) => (
               <button key={item.id} onClick={() => { navigate(item.id); setMobileOpen(false); }}

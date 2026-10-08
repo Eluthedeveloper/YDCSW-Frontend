@@ -2,10 +2,11 @@ import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { usePlayer } from '../context/PlayerContext';
+import type { Program, Track } from '../utils/types';
 import { api } from '../utils/api';
 import CoverImg from '../components/CoverImg';
-import { Play, Pause, Heart, Music, Search as SearchIcon, X } from 'lucide-react';
-import { getFingerprint } from '../utils/fingerprint';
+import LikeButton from '../components/LikeButton';
+import { Play, Pause, Music, Search as SearchIcon, X } from 'lucide-react';
 
 export default function PublicSearchPage() {
   const { t } = useTranslation('programs');
@@ -13,28 +14,52 @@ export default function PublicSearchPage() {
   const onViewProgram = (id: string) => navigate(`/programs/${id}`);
   const { play, pause, resume, currentTrack, isPlaying } = usePlayer();
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<{ programs: any[]; tracks: any[] } | null>(null);
+  const [results, setResults] = useState<{ programs: Program[]; tracks: Track[] } | null>(null);
   const [loading, setLoading] = useState(false);
-  const [searched, setSearched] = useState(false);
+  /** Last query whose results are displayed; '' means nothing searched yet. */
+  const [committedQuery, setCommittedQuery] = useState('');
+  const committedQueryRef = useRef('');
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const searched = committedQuery !== '';
+
   useEffect(() => {
-    if (!query.trim()) {
-      setResults(null);
-      setSearched(false);
-      return;
-    }
-    setLoading(true);
-    setSearched(true);
+    const term = query.trim();
+    if (!term) return;
+
+    // Debounced so typing doesn't fire a request per keystroke. The pending
+    // query lives in `pendingQuery` rather than local state, so the effect
+    // body stays free of setState; everything the UI needs to show is derived
+    // below from the committed query and the pending one.
     clearTimeout(timerRef.current ?? undefined);
-    timerRef.current = setTimeout(async () => {
-      try {
-        const data = await api.search(query.trim());
-        setResults(data);
-      } finally { setLoading(false); }
+    timerRef.current = setTimeout(() => {
+      setCommittedQuery(term);
+      committedQueryRef.current = term;
+      api.search(term)
+        .then((data) => {
+          if (term === committedQueryRef.current) setResults(data);
+        })
+        .catch(() => {
+          if (term === committedQueryRef.current) setResults(null);
+        })
+        .finally(() => {
+          if (term === committedQueryRef.current) setLoading(false);
+        });
     }, 350);
+
     return () => clearTimeout(timerRef.current ?? undefined);
   }, [query]);
+
+  const searching = query.trim() !== committedQuery || loading;
+
+  const clearSearch = () => {
+    clearTimeout(timerRef.current ?? undefined);
+    setQuery('');
+    setResults(null);
+    setCommittedQuery('');
+    committedQueryRef.current = '';
+    setLoading(false);
+  };
 
   return (
     <div>
@@ -46,7 +71,7 @@ export default function PublicSearchPage() {
             placeholder={t('search.placeholder')}
             className="w-full pl-11 pr-10 py-3.5 dark:bg-dark-600 bg-white border dark:border-white/5 border-dark-300 rounded-xl dark:text-white text-dark-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent placeholder:text-dark-300" />
           {query && (
-            <button type="button" onClick={() => { setQuery(''); setResults(null); setSearched(false); }}
+            <button type="button" onClick={clearSearch}
               className="absolute right-3 top-1/2 -translate-y-1/2 p-1 dark:text-dark-300 text-dark-500 dark:hover:text-white hover:text-dark-900">
               <X size={16} />
             </button>
@@ -54,7 +79,7 @@ export default function PublicSearchPage() {
         </div>
       </div>
 
-      {loading ? (
+      {searching ? (
         <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="glass-panel rounded-xl h-16 animate-pulse" />)}</div>
       ) : results ? (
         <div>
@@ -120,19 +145,9 @@ export default function PublicSearchPage() {
 }
 
 function TrackRow({ track, index, isActive, isPlaying, onPlay }: {
-  track: any; index: number; isActive: boolean; isPlaying: boolean; onPlay: () => void;
+  track: Track; index: number; isActive: boolean; isPlaying: boolean; onPlay: () => void;
 }) {
   const { t } = useTranslation('programs');
-  const [liked, setLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(track.like_count || 0);
-
-  const handleLike = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const fp = getFingerprint();
-    const res = await api.toggleLike(track.id, fp);
-    setLiked(res.liked);
-    setLikeCount((c: number) => res.liked ? c + 1 : Math.max(0, c - 1));
-  };
 
   return (
     <div onClick={onPlay}
@@ -149,11 +164,7 @@ function TrackRow({ track, index, isActive, isPlaying, onPlay }: {
         <p className={`text-[13px] sm:text-sm font-medium truncate ${isActive ? 'dark:text-primary-400 text-primary-600' : 'dark:text-white text-dark-900'}`}>{track.title}</p>
         <p className="text-[11px] sm:text-xs dark:text-dark-200 text-dark-600 truncate">{track.artist || t('search.unknown')} {track.program_title ? ` · ${track.program_title}` : ''}</p>
       </div>
-      <button onClick={handleLike}
-        className={`p-1.5 sm:p-2 rounded-full transition-all flex-shrink-0 ${liked ? 'text-red-400 bg-red-500/15' : 'dark:text-dark-300 text-dark-500 hover:text-red-400 hover:bg-red-500/10'}`}>
-        <Heart size={14} fill={liked ? 'currentColor' : 'none'} />
-      </button>
-      <span className="text-[11px] sm:text-xs dark:text-dark-300 text-dark-500 w-5 sm:w-6 text-right flex-shrink-0">{likeCount}</span>
+      <LikeButton trackId={track.id} likeCount={track.like_count || 0} />
     </div>
   );
 }

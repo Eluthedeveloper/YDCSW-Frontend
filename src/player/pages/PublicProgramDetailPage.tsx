@@ -3,11 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { usePlayer } from '../context/PlayerContext';
 import { usePlayerAuth } from '../context/AuthContext';
+import type { Comment, Program, Track } from '../utils/types';
 import { api } from '../utils/api';
+import { useAsyncData } from '../hooks/useAsyncData';
+import LoadError from '../components/LoadError';
 import CoverBg from '../components/CoverBg';
+import LikeButton from '../components/LikeButton';
 import { toast } from 'sonner';
 import { Play, Pause, Heart, Music, MessageCircle, Clock, ArrowLeft, Lock } from 'lucide-react';
-import { getFingerprint } from '../utils/fingerprint';
 
 export default function PublicProgramDetailPage() {
   const { t } = useTranslation('programs');
@@ -17,24 +20,38 @@ export default function PublicProgramDetailPage() {
   const { play, pause, resume, currentTrack, isPlaying } = usePlayer();
   const { user } = usePlayerAuth();
   const isAdmin = user?.role === 'super_admin' || user?.role === 'admin';
-  const [program, setProgram] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const [commentName, setCommentName] = useState('');
   const [commentText, setCommentText] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [comments, setComments] = useState<any[]>([]);
-  const [loadingComments, setLoadingComments] = useState(false);
+  const [comments, setComments] = useState<Comment[]>([]);
+  // Which program the current `comments` belong to; '' until the first load.
+  const [commentsFor, setCommentsFor] = useState('');
+
+  // `programId` is a dependency, so navigating from one program to another
+  // reloads. The hook also drops a stale response that arrives after the id has
+  // changed, which the previous effect had no guard for at all.
+  const {
+    data: program,
+    loading,
+    error,
+    reload,
+    setData: setProgram,
+  } = useAsyncData<Program | null>(() => api.getPublicProgram(programId), null, [programId]);
 
   useEffect(() => {
-    api.getPublicProgram(programId).then(setProgram).finally(() => setLoading(false));
-  }, [programId]);
-
-  useEffect(() => {
-    if (isAdmin) {
-      setLoadingComments(true);
-      api.getComments(programId).then(setComments).catch(() => setComments([])).finally(() => setLoadingComments(false));
-    }
+    if (!isAdmin) return;
+    // `cancelled` guards against a stale response overwriting a newer one when
+    // the user navigates between programs before the fetch resolves.
+    let cancelled = false;
+    api.getComments(programId)
+      .then((data) => { if (!cancelled) { setComments(data); setCommentsFor(programId); } })
+      .catch(() => { if (!cancelled) setComments([]); })
+    return () => { cancelled = true; };
   }, [programId, isAdmin]);
+
+  // Derived rather than assigned in the effect, so the spinner appears in the
+  // same render as the program id change.
+  const commentsLoading = isAdmin && commentsFor !== programId;
 
   const handleComment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,11 +61,14 @@ export default function PublicProgramDetailPage() {
       await api.postComment(programId, { guest_name: commentName, content: commentText });
       setCommentText('');
       toast.success(t('programDetail.commentSuccess'));
+      // Re-read rather than reload() so the cached path is refreshed in place
+      // and the comment list below is not reset.
       const updated = await api.getPublicProgram(programId);
       setProgram(updated);
       if (isAdmin) {
         const updatedComments = await api.getComments(programId);
         setComments(updatedComments);
+        setCommentsFor(programId);
       }
     } catch {
       toast.error(t('programDetail.commentFailed'));
@@ -57,6 +77,10 @@ export default function PublicProgramDetailPage() {
 
   if (loading) {
     return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" /></div>;
+  }
+
+  if (error) {
+    return <LoadError error={error} onRetry={reload} />;
   }
 
   if (!program) return <p className="dark:text-dark-200 text-dark-600 text-center py-20">{t('programDetail.notFound')}</p>;
@@ -92,7 +116,7 @@ export default function PublicProgramDetailPage() {
             </div>
           ) : (
             <div className="space-y-2">
-              {program.tracks?.map((t: any, i: number) => (
+              {program.tracks?.map((t: Track, i: number) => (
                 <TrackRow key={t.id} track={t} index={i + 1}
                   isActive={currentTrack?.id === t.id}
                   isPlaying={currentTrack?.id === t.id && isPlaying}
@@ -122,12 +146,12 @@ export default function PublicProgramDetailPage() {
           </form>
           {isAdmin ? (
             <div className="space-y-3">
-              {loadingComments ? (
+              {commentsLoading ? (
                 <div className="flex justify-center py-4"><div className="w-6 h-6 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" /></div>
               ) : comments.length === 0 ? (
                 <p className="text-sm dark:text-dark-300 text-dark-500 text-center py-4">No comments yet</p>
               ) : (
-                comments.map((c: any) => (
+                comments.map((c: Comment) => (
                   <div key={c.id} className="glass-panel rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-2">
                       <div className="w-6 h-6 rounded-full bg-primary-600/20 flex items-center justify-center text-primary-400 text-[10px] font-bold">
@@ -154,24 +178,8 @@ export default function PublicProgramDetailPage() {
 }
 
 function TrackRow({ track, index, isActive, isPlaying, onPlay }: {
-  track: any; index: number; isActive: boolean; isPlaying: boolean; onPlay: () => void;
+  track: Track; index: number; isActive: boolean; isPlaying: boolean; onPlay: () => void;
 }) {
-  const [liked, setLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(track.like_count || 0);
-
-  useEffect(() => {
-    const fp = getFingerprint();
-    api.checkLiked(track.id, fp).then((r: any) => setLiked(r.liked)).catch(() => {});
-  }, [track.id]);
-
-  const handleLike = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const fp = getFingerprint();
-    const res = await api.toggleLike(track.id, fp);
-    setLiked(res.liked);
-    setLikeCount((c: number) => res.liked ? c + 1 : Math.max(0, c - 1));
-  };
-
   return (
     <div onClick={onPlay}
       className={`flex items-center gap-1.5 sm:gap-4 p-2 sm:p-3 rounded-xl cursor-pointer transition-all group ${
@@ -190,11 +198,7 @@ function TrackRow({ track, index, isActive, isPlaying, onPlay }: {
       {track.track_type && (
         <span className="hidden sm:inline text-[10px] dark:text-dark-300 text-dark-500 uppercase dark:bg-dark-600 bg-light-200 px-2 py-0.5 rounded flex-shrink-0">{track.track_type}</span>
       )}
-      <button onClick={handleLike}
-        className={`p-1.5 sm:p-2 rounded-full transition-all flex-shrink-0 ${liked ? 'text-red-400 bg-red-500/15' : 'dark:text-dark-300 text-dark-500 hover:text-red-400 hover:bg-red-500/10'}`}>
-        <Heart size={14} fill={liked ? 'currentColor' : 'none'} />
-      </button>
-      <span className="text-[11px] sm:text-xs dark:text-dark-300 text-dark-500 w-5 sm:w-6 text-right flex-shrink-0">{likeCount}</span>
+      <LikeButton trackId={track.id} likeCount={track.like_count || 0} />
     </div>
   );
 }

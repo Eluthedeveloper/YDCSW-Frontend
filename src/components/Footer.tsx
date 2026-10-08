@@ -2,6 +2,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { site } from "../lib/site";
 
 const SOCIAL_LINKS = [
   {
@@ -129,15 +130,19 @@ export function Footer(): React.ReactElement {
         <div>
           <h4 className="font-serif text-sm uppercase tracking-widest text-foreground">Contact</h4>
           <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
-            <li>Yemisrach Dimts Communication Service</li>
-            <li>XPCJ+8Q9, Guinea Bissau St, Addis Ababa, Ethiopia</li>
-            <li>info@yemisrachdimts.org</li>
-            <li>+251 (0) 11 123 4567</li>
+            <li>{site.organisation}</li>
+            <li>{site.address}</li>
+            <li>
+              <a href={`mailto:${site.email}`} className="transition hover:text-gold">{site.email}</a>
+            </li>
+            <li>
+              <a href={`tel:${site.phoneHref}`} className="transition hover:text-gold">{site.phone}</a>
+            </li>
           </ul>
         </div>
       </div>
       <div className="mx-auto mt-12 max-w-7xl border-t border-border px-6 pt-6 text-xs text-muted-foreground lg:px-12">
-        © {new Date().getFullYear()} Yemisrach Dimts Communication Service (EECMY‑YDCS). All rights reserved.
+        © {new Date().getFullYear()} {site.organisation} (EECMY‑YDCS). All rights reserved.
       </div>
     </footer>
   );

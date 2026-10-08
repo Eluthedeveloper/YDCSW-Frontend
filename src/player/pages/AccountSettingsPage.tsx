@@ -40,10 +40,10 @@ export default function AccountSettingsPage() {
       setPassword('');
       if (updated.username) setUsername(updated.username);
       if (updated.email) setEmail(updated.email);
-      if (updated.token) localStorage.setItem('token', updated.token);
-      window.location.reload();
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to update account');
+      // No token to store: the server re-issues the httpOnly session cookie on
+      // a password change, so there is nothing to copy into storage or reload for.
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update account');
     } finally {
       setSaving(false);
     }

@@ -1,18 +1,21 @@
-import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePlayer } from '../context/PlayerContext';
+import type { Track } from '../utils/types';
 import { api } from '../utils/api';
+import { useAsyncData } from '../hooks/useAsyncData';
+import LoadError from '../components/LoadError';
 import CoverImg from '../components/CoverImg';
-import { Play, Pause, Heart, Music } from 'lucide-react';
-import { getFingerprint } from '../utils/fingerprint';
+import LikeButton from '../components/LikeButton';
+import { Play, Pause, Music } from 'lucide-react';
 
 export default function PublicLatestTracksPage() {
   const { t } = useTranslation('programs');
   const { play, pause, resume, currentTrack, isPlaying } = usePlayer();
-  const [tracks, setTracks] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => { api.getLatestTracks().then(setTracks).finally(() => setLoading(false)); }, []);
+  const { data: tracks, loading, error, reload } = useAsyncData<Track[]>(
+    () => api.getLatestTracks(),
+    []
+  );
 
   return (
     <div>
@@ -21,7 +24,9 @@ export default function PublicLatestTracksPage() {
         <p className="dark:text-dark-200 text-dark-600">{t('latestTracks.subtitle')}</p>
       </div>
 
-      {loading ? (
+      {error ? (
+        <LoadError error={error} onRetry={reload} />
+      ) : loading ? (
         <div className="space-y-2">{[1, 2, 3, 4, 5].map(i => <div key={i} className="glass-panel rounded-xl h-16 animate-pulse" />)}</div>
       ) : tracks.length === 0 ? (
         <div className="text-center py-20 glass-panel rounded-2xl">
@@ -47,24 +52,9 @@ export default function PublicLatestTracksPage() {
 }
 
 function TrackRow({ track, index, isActive, isPlaying, onPlay }: {
-  track: any; index: number; isActive: boolean; isPlaying: boolean; onPlay: () => void;
+  track: Track; index: number; isActive: boolean; isPlaying: boolean; onPlay: () => void;
 }) {
   const { t } = useTranslation('programs');
-  const [liked, setLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(track.like_count || 0);
-
-  useEffect(() => {
-    const fp = getFingerprint();
-    api.checkLiked(track.id, fp).then((r: any) => setLiked(r.liked)).catch(() => {});
-  }, [track.id]);
-
-  const handleLike = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const fp = getFingerprint();
-    const res = await api.toggleLike(track.id, fp);
-    setLiked(res.liked);
-    setLikeCount((c: number) => res.liked ? c + 1 : Math.max(0, c - 1));
-  };
 
   return (
     <div onClick={onPlay}
@@ -87,11 +77,7 @@ function TrackRow({ track, index, isActive, isPlaying, onPlay }: {
       {track.track_type && (
         <span className="hidden sm:inline text-[10px] dark:text-dark-300 text-dark-500 uppercase dark:bg-dark-600 bg-light-200 px-2 py-0.5 rounded flex-shrink-0">{track.track_type}</span>
       )}
-      <button onClick={handleLike}
-        className={`p-1.5 sm:p-2 rounded-full transition-all flex-shrink-0 ${liked ? 'text-red-400 bg-red-500/15' : 'dark:text-dark-300 text-dark-500 hover:text-red-400 hover:bg-red-500/10'}`}>
-        <Heart size={14} fill={liked ? 'currentColor' : 'none'} />
-      </button>
-      <span className="text-[11px] sm:text-xs dark:text-dark-300 text-dark-500 w-5 sm:w-6 text-right flex-shrink-0">{likeCount}</span>
+      <LikeButton trackId={track.id} likeCount={track.like_count || 0} />
     </div>
   );
 }

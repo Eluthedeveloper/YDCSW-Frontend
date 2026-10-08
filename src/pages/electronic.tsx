@@ -1,5 +1,6 @@
 // src/pages/ElectronicMediaDivisionPage.tsx
-import React, { useState } from "react";
+import React from "react";
+import { useGalleryModal } from '../hooks/useGalleryModal';
 import { Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
@@ -58,42 +59,10 @@ const galleryImages: GalleryImage[] = [
 
 export function ElectronicMediaDivisionPage(): React.ReactElement {
   const { t } = useTranslation();
-  const [selectedImage, setSelectedImage] = useState<GalleryImage | null>(null);
-  const [currentIndex, setCurrentIndex] = useState<number>(0);
+  const { selectedImage, selectedIndex, open, close, goToNext, goToPrevious } =
+    useGalleryModal(galleryImages);
 
-  const openModal = (image: GalleryImage, index: number) => {
-    setSelectedImage(image);
-    setCurrentIndex(index);
-    document.body.style.overflow = "hidden";
-  };
-
-  const closeModal = () => {
-    setSelectedImage(null);
-    document.body.style.overflow = "";
-  };
-
-  const goToPrevious = () => {
-    const newIndex = currentIndex === 0 ? galleryImages.length - 1 : currentIndex - 1;
-    setCurrentIndex(newIndex);
-    setSelectedImage(galleryImages[newIndex]);
-  };
-
-  const goToNext = () => {
-    const newIndex = currentIndex === galleryImages.length - 1 ? 0 : currentIndex + 1;
-    setCurrentIndex(newIndex);
-    setSelectedImage(galleryImages[newIndex]);
-  };
-
-  React.useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!selectedImage) return;
-      if (e.key === "Escape") closeModal();
-      if (e.key === "ArrowLeft") goToPrevious();
-      if (e.key === "ArrowRight") goToNext();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedImage, currentIndex]);
+  const currentIndex = selectedIndex ?? 0;
 
   const duties = t("electronic.duties", { returnObjects: true }) as string[];
 
@@ -170,11 +139,11 @@ export function ElectronicMediaDivisionPage(): React.ReactElement {
               </h2>
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {galleryImages.map((image, index) => (
+              {galleryImages.map((image) => (
                 <figure
                   key={image.id}
                   className="group cursor-pointer overflow-hidden rounded-2xl bg-card shadow-[var(--shadow-elegant)] transition hover:shadow-xl"
-                  onClick={() => openModal(image, index)}
+                  onClick={() => open(image)}
                 >
                   <div className="aspect-[4/3] overflow-hidden bg-muted">
                     <img
@@ -197,11 +166,11 @@ export function ElectronicMediaDivisionPage(): React.ReactElement {
         {selectedImage && (
           <div
             className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4"
-            onClick={closeModal}
+            onClick={close}
           >
             {/* Close button */}
             <button
-              onClick={closeModal}
+              onClick={close}
               className="absolute top-4 right-4 z-10 rounded-full bg-white/10 p-3 text-white transition hover:bg-white/20"
               aria-label={t("electronic.gallery.close")}
             >

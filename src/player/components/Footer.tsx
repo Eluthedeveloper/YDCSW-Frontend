@@ -24,7 +24,7 @@ export default function Footer() {
           </div>
 
           <p className="text-xs dark:text-dark-300 text-dark-500">
-            &copy; {new Date().getFullYear()} Yemisrach Dimts Media
+            &copy; {new Date().getFullYear()} Yemisrach Dimts Communication Service
           </p>
         </div>
       </div>
