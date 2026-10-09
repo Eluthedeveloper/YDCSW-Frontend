@@ -77,3 +77,50 @@ export interface TrackUpdateInput {
   track_type?: string;
   duration?: number;
 }
+
+export interface Leader {
+  id: string;
+  name: string;
+  title: string;
+  quote?: string | null;
+  role_label?: string | null;
+  photo?: string | null;
+  sort_order: number;
+  created_at?: string;
+}
+
+export interface AlbumPhoto {
+  id: string;
+  album_id: string;
+  caption?: string | null;
+  file_name: string;
+  sort_order?: number;
+  created_at?: string;
+}
+
+export interface Album {
+  id: string;
+  title: string;
+  description?: string | null;
+  created_by?: string;
+  created_at?: string;
+  photos: AlbumPhoto[];
+}
+
+export interface Announcement {
+  id: string;
+  title: string;
+  body?: string | null;
+  pinned: number;
+  created_at?: string;
+}
+
+export interface SiteEvent {
+  id: string;
+  title: string;
+  description?: string | null;
+  location?: string | null;
+  starts_at: string;
+  ends_at?: string | null;
+  created_at?: string;
+}

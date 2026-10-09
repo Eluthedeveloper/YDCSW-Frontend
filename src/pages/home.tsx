@@ -10,6 +10,9 @@ import filmImg from "../assets/film.jpg";
 import radioImg from "../assets/radio.jpg";
 import { SiteShell } from "../components/site/SiteShell";
 import { RadioSchedule } from "../components/RadioSchedule";
+import { useAsyncData } from "../player/hooks/useAsyncData";
+import { api } from "../player/utils/api";
+import type { Announcement, SiteEvent } from "../player/utils/types";
 
 function Hero() {
   const { t } = useTranslation();
@@ -227,6 +230,107 @@ function RadioHighlight() {
   );
 }
 
+/**
+ * Homepage announcements and upcoming events, managed from the admin panel.
+ *
+ * Each block renders only when it has content, and the whole section returns
+ * null when neither exists — so a site with nothing published still shows the
+ * original page, with no empty headings.
+ */
+function Notices() {
+  const { t } = useTranslation();
+
+  const { data: { announcements, events } } = useAsyncData(
+    () =>
+      Promise.all([
+        api.getAnnouncements().catch(() => [] as Announcement[]),
+        api.getSiteEvents().catch(() => [] as SiteEvent[]),
+      ]).then(([announcementRows, eventRows]) => ({
+        announcements: announcementRows,
+        events: eventRows,
+      })),
+    { announcements: [] as Announcement[], events: [] as SiteEvent[] }
+  );
+
+  const now = Date.now();
+  // Only events that have not finished yet; the API returns newest-dated
+  // first, so slicing keeps the soonest upcoming ones.
+  const upcoming = events
+    .filter((event) => {
+      const end = new Date((event.ends_at ?? event.starts_at).replace(" ", "T")).getTime();
+      return Number.isFinite(end) && end >= now;
+    })
+    .slice(0, 4);
+  const visibleAnnouncements = announcements.slice(0, 4);
+
+  if (visibleAnnouncements.length === 0 && upcoming.length === 0) return null;
+
+  const formatDate = (mysql: string) => {
+    const parsed = new Date(mysql.replace(" ", "T"));
+    return Number.isNaN(parsed.getTime())
+      ? mysql
+      : parsed.toLocaleString(undefined, { dateStyle: "full", timeStyle: "short" });
+  };
+
+  return (
+    <section className="bg-secondary py-24 lg:py-32">
+      <div className="mx-auto max-w-7xl px-6 lg:px-12">
+        <div className={`grid gap-12 ${visibleAnnouncements.length > 0 && upcoming.length > 0 ? "lg:grid-cols-2" : ""}`}>
+          {visibleAnnouncements.length > 0 && (
+            <div>
+              <p className="text-xs uppercase tracking-[0.3em] text-gold">{t("home.notices.announcementsTag")}</p>
+              <h2 className="mt-4 font-serif text-4xl text-foreground sm:text-5xl">{t("home.notices.announcementsTitle")}</h2>
+              <div className="mt-8 space-y-4">
+                {visibleAnnouncements.map((announcement) => (
+                  <article key={announcement.id} className="rounded-2xl bg-card p-6 shadow-[var(--shadow-elegant)]">
+                    <div className="flex flex-wrap items-center gap-3">
+                      {announcement.pinned === 1 && (
+                        <span className="rounded-full bg-gold/15 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-gold">
+                          {t("home.notices.pinned")}
+                        </span>
+                      )}
+                      <h3 className="font-serif text-xl text-foreground">{announcement.title}</h3>
+                    </div>
+                    {announcement.body && (
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{announcement.body}</p>
+                    )}
+                    {announcement.created_at && (
+                      <p className="mt-3 text-xs uppercase tracking-widest text-muted-foreground/70">{formatDate(announcement.created_at)}</p>
+                    )}
+                  </article>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {upcoming.length > 0 && (
+            <div>
+              <p className="text-xs uppercase tracking-[0.3em] text-gold">{t("home.notices.eventsTag")}</p>
+              <h2 className="mt-4 font-serif text-4xl text-foreground sm:text-5xl">{t("home.notices.eventsTitle")}</h2>
+              <div className="mt-8 space-y-4">
+                {upcoming.map((event) => (
+                  <article key={event.id} className="rounded-2xl bg-card p-6 shadow-[var(--shadow-elegant)]">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <h3 className="font-serif text-xl text-foreground">{event.title}</h3>
+                      {event.location && (
+                        <span className="text-xs uppercase tracking-widest text-gold">{event.location}</span>
+                      )}
+                    </div>
+                    <p className="mt-2 text-sm font-medium text-gold">{formatDate(event.starts_at)}</p>
+                    {event.description && (
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{event.description}</p>
+                    )}
+                  </article>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function CTA() {
   const { t } = useTranslation();
   return (
@@ -264,6 +368,7 @@ export function HomePage(): React.ReactElement {
       <SiteShell>
         <Hero />
         <Verse />
+        <Notices />
         <RadioHighlight />
         <ProgramsCTA />
         <Ministries />

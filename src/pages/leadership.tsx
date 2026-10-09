@@ -3,6 +3,9 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import { Helmet } from "react-helmet-async";
 import { SiteShell } from "../components/site/SiteShell";
+import { useAsyncData } from "../player/hooks/useAsyncData";
+import { api, uploadUrl } from "../player/utils/api";
+import type { Leader } from "../player/utils/types";
 
 // Import existing head photos – adjust paths as needed
 import headElectronic from "../assets/head-electronic.png";
@@ -28,10 +31,48 @@ interface LeaderMember {
   quote: string;
 }
 
+/** One card, from either the database or the built-in translation fallback. */
+interface DisplayLeader {
+  key: string;
+  name: string;
+  title: string;
+  quote: string;
+  photo: string | undefined;
+  role: string;
+}
+
 export function LeadershipPage(): React.ReactElement {
   const { t } = useTranslation();
 
-  const members = t("leadership.members", { returnObjects: true }) as LeaderMember[];
+  // The page must render even if the API is down or empty: on failure the
+  // loader resolves to [], which selects the same hardcoded members the page
+  // has always shown. Visitors never see a blank leadership page because of a
+  // backend hiccup.
+  const { data: dbLeaders } = useAsyncData<Leader[]>(
+    () => api.getLeaders().catch(() => [] as Leader[]),
+    []
+  );
+
+  const fallbackMembers = t("leadership.members", { returnObjects: true }) as LeaderMember[];
+
+  const leaders: DisplayLeader[] =
+    dbLeaders.length > 0
+      ? dbLeaders.map((leader) => ({
+          key: leader.id,
+          name: leader.name,
+          title: leader.title,
+          quote: leader.quote ?? "",
+          photo: leader.photo ? uploadUrl(`leaders/${leader.photo}`) : undefined,
+          role: leader.role_label ?? "",
+        }))
+      : fallbackMembers.map((member) => ({
+          key: member.id,
+          name: member.name,
+          title: member.title,
+          quote: member.quote,
+          photo: photosById[member.id],
+          role: t(`leadership.${member.id}`),
+        }));
 
   return (
     <>
@@ -59,18 +100,24 @@ export function LeadershipPage(): React.ReactElement {
         <section className="bg-background py-20 lg:py-28">
           <div className="mx-auto max-w-7xl px-6 lg:px-12">
             <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
-              {members.map((leader) => (
+              {leaders.map((leader) => (
                 <div
-                  key={leader.id}
+                  key={leader.key}
                   className="overflow-hidden rounded-2xl bg-card shadow-[var(--shadow-elegant)] transition hover:-translate-y-1 hover:shadow-xl"
                 >
                   <div className="aspect-[4/5] overflow-hidden bg-muted">
-                    <img
-                      src={photosById[leader.id]}
-                      alt={leader.name}
-                      loading="lazy"
-                      className="h-full w-full object-cover"
-                    />
+                    {leader.photo ? (
+                      <img
+                        src={leader.photo}
+                        alt={leader.name}
+                        loading="lazy"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center font-serif text-6xl text-muted-foreground/40">
+                        {leader.name.charAt(0)}
+                      </div>
+                    )}
                   </div>
                   <div className="p-6">
                     <h3 className="font-display text-2xl font-bold text-foreground">
@@ -79,12 +126,16 @@ export function LeadershipPage(): React.ReactElement {
                     <p className="mt-1 text-sm font-medium uppercase tracking-wider text-gold">
                       {leader.title}
                     </p>
-                    <p className="mt-3 text-sm italic text-muted-foreground">
-                      “{leader.quote}”
-                    </p>
-                    <p className="mt-2 text-xs uppercase tracking-widest text-muted-foreground/70">
-                      {t(`leadership.${leader.id}`)}
-                    </p>
+                    {leader.quote && (
+                      <p className="mt-3 text-sm italic text-muted-foreground">
+                        “{leader.quote}”
+                      </p>
+                    )}
+                    {leader.role && (
+                      <p className="mt-2 text-xs uppercase tracking-widest text-muted-foreground/70">
+                        {leader.role}
+                      </p>
+                    )}
                   </div>
                 </div>
               ))}

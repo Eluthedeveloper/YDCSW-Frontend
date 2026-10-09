@@ -43,6 +43,13 @@ const am = {
       text: '“ሕግህ ለእግሬ መብራት፥ ለመንገዴ ብርሃን ነው።”',
       ref: "መዝሙረ ዳዊት 119:105",
     },
+    notices: {
+      announcementsTag: "ማስታወቂያዎች",
+      announcementsTitle: "የቅርብ ማስታወቂያዎች",
+      eventsTag: "ዝግጅቶች",
+      eventsTitle: "የሚመጡ ዝግጅቶች",
+      pinned: "የተሰደደ",
+    },
     ministries: {
       tag: "የምናዘጋጀው",
       title: "ወንጌልን ለዓለሙ ማወጅ!",
@@ -192,6 +199,10 @@ const am = {
     title: "ከጉዞው ቅጽበቶች።",
     subtitle: "ከሌንስ ጀርባ አንድ ቅጽበት — ሥራችንን የሚቀርጹ ሰዎች፣ ቦታዎች እና ጸሎቶች።",
     albumTag: "የፎቶ ማህደር",
+    backToAlbums: "ሁሉም ማህደሮች",
+    emptyAlbum: "በዚህ ማህደር ውስጥ እስካሁን ፎቶ የለም።",
+    photoCountOne: "ፎቶ 1",
+    photoCountOther: "ፎቶ {{n}}",
   },
   leadership: {
     metaTitle: "የአመራር ሰራተኞቻችን — የምሥራች ድምጽ",

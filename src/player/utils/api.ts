@@ -3,6 +3,7 @@ import { getFingerprint } from './fingerprint';
 import type {
   AuthUser, Comment, MeUpdateInput, CreateUserInput, Program,
   SearchResults, Track, TrackUpdateInput, UserRow,
+  Leader, Album, Announcement, SiteEvent,
 } from './types';
 
 export const uploadUrl = baseUploadUrl;
@@ -230,6 +231,52 @@ export const api = {
 
   bulkUploadTracksWithProgress: (data: FormData, onProgress: (percent: number) => void) =>
     formRequestWithProgress<BulkUploadResult>('/tracks/bulk', data, onProgress),
+
+  // ---- Site content: leadership, albums, announcements, events ----
+
+  // Public reads (anonymous, cached on the server).
+  getLeaders: () => request<Leader[]>('/site/leaders'),
+  getAlbums: () => request<Album[]>('/site/albums'),
+  getAnnouncements: () => request<Announcement[]>('/site/announcements'),
+  getSiteEvents: () => request<SiteEvent[]>('/site/events'),
+
+  // Leaders. Create/update are multipart because a photo rides along; the
+  // backend reads `req.body` the same way either way.
+  createLeader: (data: FormData) => formRequest<Leader>('/site/leaders', data),
+  updateLeader: (id: string, data: FormData) =>
+    formRequest<{ message: string }>(`/site/leaders/${id}`, data, 'PUT'),
+  deleteLeader: (id: string) =>
+    request<{ message: string }>(`/site/leaders/${id}`, { method: 'DELETE' }),
+  reorderLeaders: (ids: string[]) =>
+    request<{ message: string }>('/site/leaders/reorder', {
+      method: 'PUT',
+      body: JSON.stringify({ ids }),
+    }),
+
+  createAlbum: (data: { title: string; description?: string }) =>
+    request<Album>('/site/albums', { method: 'POST', body: JSON.stringify(data) }),
+  updateAlbum: (id: string, data: { title?: string; description?: string | null }) =>
+    request<{ message: string }>(`/site/albums/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteAlbum: (id: string) =>
+    request<{ message: string }>(`/site/albums/${id}`, { method: 'DELETE' }),
+  addAlbumPhotos: (albumId: string, data: FormData) =>
+    formRequest<{ uploaded: number }>(`/site/albums/${albumId}/photos`, data),
+  deleteAlbumPhoto: (albumId: string, photoId: string) =>
+    request<{ message: string }>(`/site/albums/${albumId}/photos/${photoId}`, { method: 'DELETE' }),
+
+  createAnnouncement: (data: { title: string; body?: string; pinned?: boolean }) =>
+    request<Announcement>('/site/announcements', { method: 'POST', body: JSON.stringify(data) }),
+  updateAnnouncement: (id: string, data: { title?: string; body?: string | null; pinned?: boolean }) =>
+    request<{ message: string }>(`/site/announcements/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteAnnouncement: (id: string) =>
+    request<{ message: string }>(`/site/announcements/${id}`, { method: 'DELETE' }),
+
+  createSiteEvent: (data: { title: string; description?: string; location?: string; starts_at: string; ends_at?: string }) =>
+    request<SiteEvent>('/site/events', { method: 'POST', body: JSON.stringify(data) }),
+  updateSiteEvent: (id: string, data: { title?: string; description?: string | null; location?: string | null; starts_at?: string; ends_at?: string | null }) =>
+    request<{ message: string }>(`/site/events/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteSiteEvent: (id: string) =>
+    request<{ message: string }>(`/site/events/${id}`, { method: 'DELETE' }),
 
   getAnalytics: () => request<Analytics>('/analytics/'),
 

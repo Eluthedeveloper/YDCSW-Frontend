@@ -42,6 +42,7 @@ const PlayerAnalyticsPage = lazy(() => import("./player/pages/AnalyticsPage"));
 const PlayerCommentsPage = lazy(() => import("./player/pages/CommentsPage"));
 const PlayerUsersPage = lazy(() => import("./player/pages/UsersPage"));
 const PlayerAccountSettingsPage = lazy(() => import("./player/pages/AccountSettingsPage"));
+const PlayerSiteContentPage = lazy(() => import("./player/pages/SiteContentPage"));
 
 /**
  * Shell shown while a split chunk loads. Styled to sit inside both the admin
@@ -65,6 +66,7 @@ const SUPER_ADMIN_PAGES: readonly string[] = ['users'];
 const ADMIN_PAGES: Record<string, React.ReactNode> = {
   programs: <PlayerProgramsPage />,
   player: <PlayerAdminPage />,
+  site: <PlayerSiteContentPage />,
   analytics: <PlayerAnalyticsPage />,
   comments: <PlayerCommentsPage />,
   users: <PlayerUsersPage />,

@@ -43,6 +43,13 @@ const om = {
       text: '"Dubbiin kee miilla kootiif ibsaadha, daandii koo irrattis ni ifa."',
       ref: "Faarfannaa 119:105"
     },
+    notices: {
+      announcementsTag: "Beeksisaa",
+      announcementsTitle: "Beeksisaa dhihoo",
+      eventsTag: "Tarkaanffii",
+      eventsTitle: "Tarkaanffii fuudhuraatti",
+      pinned: "Kabajamoo",
+    },
     ministries: {
       tag: "Waan oomishnu",
       title: "Wangeela biyya Lafaa Hundatti Labsuu!",
@@ -187,6 +194,10 @@ const om = {
     title: "Tuuqaawwan imalaa.",
     subtitle: "Gargar lensii — namoota, iddoo, fi kadhannaa hojii keenya uuman.",
     albumTag: "Galmee Suuraa",
+    backToAlbums: "Waldaalee hunda",
+    emptyAlbum: "Galmee kana keessa amma suuraan hin jiru.",
+    photoCountOne: "suura 1",
+    photoCountOther: "suura {{n}}",
   },
   leadership: {
     metaTitle: "Hooggansaa keenya — Sagalee Missirachoo",

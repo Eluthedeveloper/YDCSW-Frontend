@@ -43,6 +43,13 @@ const en = {
       text: '"Your word is a lamp for my feet, a light on my path."',
       ref: "Psalm 119:105",
     },
+    notices: {
+      announcementsTag: "Announcements",
+      announcementsTitle: "Latest announcements",
+      eventsTag: "Events",
+      eventsTitle: "Upcoming events",
+      pinned: "Pinned",
+    },
     ministries: {
       tag: "What we make",
       title: "Proclaming the Gospel to His World!",
@@ -188,6 +195,10 @@ const en = {
     title: "Moments from the journey.",
     subtitle: "A glimpse behind the lens — the people, places, and prayers that shape our work.",
     albumTag: "Photo Album",
+    backToAlbums: "All albums",
+    emptyAlbum: "No photos in this album yet.",
+    photoCountOne: "1 photo",
+    photoCountOther: "{{n}} photos",
   },
   leadership: {
     metaTitle: "Our Leadership Staff — Yemisrach Dimts",
