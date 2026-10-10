@@ -1,3 +1,6 @@
+import Bole from "../assets/Bole.jpg";
+import Piassa from "../assets/Piassa.jpg";
+
 export interface Bookshop {
   id: number;
   name: string;
@@ -7,6 +10,8 @@ export interface Bookshop {
   lat: number;
   lng: number;
   googleMapsUrl: string;
+  /** Branch photo. Falls back to the generic shop image when absent. */
+  image?: string;
 }
 
 export const bookshops: Bookshop[] = [
@@ -14,11 +19,12 @@ export const bookshops: Bookshop[] = [
     id: 1,
     name: "Piyassa Branch",
     address: "Piyassa, Addis Ababa",
-    phone: "+251-11-XXX-XXXX",
+    phone: "+251-9-40-264127",
     description: "Main branch located in the heart of Piyassa, offering a wide selection of Christian literature and vestments.",
     lat: 9.0322,
     lng: 38.7424,
     googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=9.0322,38.7424",
+    image: Piassa,
   },
   {
     id: 2,
@@ -44,11 +50,12 @@ export const bookshops: Bookshop[] = [
     id: 4,
     name: "Bole Branch",
     address: "Bole, Addis Ababa",
-    phone: "+251-11-XXX-XXXX",
+    phone: "+251-9-22-137103",
     description: "Located in the bustling Bole area, providing easy access to Christian resources for the community.",
     lat: 9.003,
     lng: 38.7637,
     googleMapsUrl: "https://www.google.com/maps/search/?api=1&query=9.0030,38.7637",
+    image: Bole,
   },
   {
     id: 5,

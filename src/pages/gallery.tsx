@@ -27,7 +27,7 @@ const PHOTOS: Photo[] = [
   { src: filmImg, caption: "Crew prayer before the first take", tag: "Behind the scenes" },
   { src: heroImg, caption: "Congregation in song", tag: "Worship" },
   { src: bibleImg, caption: "Morning study group", tag: "Community" },
-  { src: podcastImg, caption: "Guest interview, Episode 47", tag: "Podcast" },
+  { src: podcastImg, caption: "Guest interview", tag: "Podcast" },
 ];
 
 export function GalleryPage(): React.ReactElement {

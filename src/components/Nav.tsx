@@ -88,19 +88,28 @@ export function Nav(): React.ReactElement {
   // Built as a plain element rather than a nested component: it needs this
   // component's i18n instance, and defining it at module scope would mean
   // threading that state down through props.
+  // `code` stays the i18n key (locale files are am/en/om); `label` is what the
+  // visitor reads — Oromo's common written form is "OR", not the ISO "om".
+  const LANGUAGES = [
+    { code: "en", label: "ENG" },
+    { code: "am", label: "AMH" },
+    { code: "om", label: "OR" },
+  ];
+
   const languageButtons = (
-    <div className="flex items-center gap-1">
-      {["am", "en", "om"].map((lng) => (
+    <div className="flex items-center rounded-full border border-background/15 p-0.5">
+      {LANGUAGES.map(({ code, label }) => (
         <button
-          key={lng}
-          onClick={() => changeLanguage(lng)}
-          className={`text-xs font-medium px-2 py-1 rounded transition ${
-            i18n.language === lng
-              ? "bg-gold text-gold-foreground"
+          key={code}
+          onClick={() => changeLanguage(code)}
+          aria-label={`Switch language to ${label}`}
+          className={`rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide transition ${
+            i18n.language === code
+              ? "bg-gold text-gold-foreground shadow-sm"
               : "text-background/70 hover:text-gold"
           }`}
         >
-          {lng.toUpperCase()}
+          {label}
         </button>
       ))}
     </div>

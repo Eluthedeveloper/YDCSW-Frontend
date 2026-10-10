@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { Routes, Route, useLocation, useParams, Navigate, BrowserRouter } from "react-router-dom";
 import { PlayerProvider } from "./player/context/PlayerContext";
 import { PlayerAuthProvider, usePlayerAuth } from "./player/context/AuthContext";
@@ -76,6 +76,10 @@ const ADMIN_PAGES: Record<string, React.ReactNode> = {
 function PlayerAdminSite() {
   const { user, isChecking, isSuperAdmin } = usePlayerAuth();
   const { page } = useParams();
+  // Lives here rather than inside Sidebar: the main content's left margin has
+  // to track the sidebar width, and two components holding copies of the same
+  // flag would drift apart.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Hold a neutral shell until the session check resolves. Rendering the login
   // form first would flash it at an admin who is in fact still signed in.
@@ -99,13 +103,27 @@ function PlayerAdminSite() {
 
   return (
     <div className="min-h-screen">
-      <Sidebar activePage={activePage} />
-      <main className="pt-14 md:pt-0 md:ml-64 p-4 md:p-8 pb-28">
+      <Sidebar
+        activePage={activePage}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
+      />
+      <main
+        className={`pt-14 md:pt-0 p-4 md:p-8 pb-28 transition-[margin] duration-300 ${
+          sidebarCollapsed ? "md:ml-16" : "md:ml-64"
+        }`}
+      >
         <Suspense fallback={<RouteFallback />}>
           {ADMIN_PAGES[activePage]}
         </Suspense>
       </main>
-      <Footer />
+      {/* The sidebar is fixed and full-height, so the footer needs the same
+          tracking margin or its left edge sits underneath the menu. */}
+      <div
+        className={`transition-[margin] duration-300 ${sidebarCollapsed ? "md:ml-16" : "md:ml-64"}`}
+      >
+        <Footer />
+      </div>
     </div>
   );
 }

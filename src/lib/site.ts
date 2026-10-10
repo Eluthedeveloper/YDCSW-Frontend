@@ -15,12 +15,12 @@ export const site = {
   address: 'XPCJ+8Q9, Guinea Bissau St, Addis Ababa, Ethiopia',
   email: 'info@yemisrachdimts.org',
   /** As displayed to a reader. */
-  phone: '+251 (0) 11 123 4567',
+  phone: '+251 (0) 11 321 0134',
   /**
    * Dialable form for `tel:`. Stripped of spaces, punctuation and the
    * international trunk prefix, which diallers reject.
    */
-  phoneHref: '+251111234567',
+  phoneHref: '+2519112493368',
   mapsQuery: 'XPCJ+8Q9, Guinea Bissau St, Addis Ababa, Ethiopia',
 } as const;
 

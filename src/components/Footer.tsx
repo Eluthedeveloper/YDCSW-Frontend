@@ -80,7 +80,7 @@ export function Footer(): React.ReactElement {
         <div>
           <div className="flex items-center gap-2">
             <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6 text-gold" stroke="currentColor" strokeWidth="2">
-              <path d="M12 2v20M2 12h20M12 2l4 6M12 2l-4 6" strokeLinecap="round" />
+              <path d="M12 2v20M6 8h12" strokeLinecap="round" />
             </svg>
             <span className="font-serif text-xl text-foreground">Yemisrach Dimts</span>
           </div>

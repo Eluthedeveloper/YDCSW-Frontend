@@ -6,12 +6,13 @@ import ThemeToggle from './ThemeToggle';
 
 interface SidebarProps {
   activePage: string;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
 }
 
-export default function Sidebar({ activePage }: SidebarProps) {
+export default function Sidebar({ activePage, collapsed, onToggleCollapse }: SidebarProps) {
   const { user, logout } = usePlayerAuth();
   const navigate = useNavigate();
-  const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const menuItems = [
@@ -42,7 +43,7 @@ export default function Sidebar({ activePage }: SidebarProps) {
             <span className="font-bold dark:text-white text-dark-900 gradient-text text-sm">Yemisrach Dimts</span>
           </div>
         )}
-        <button onClick={() => setCollapsed(!collapsed)} className="p-1.5 rounded-lg dark:hover:bg-dark-500 hover:bg-light-300 transition-colors hidden md:block">
+        <button onClick={onToggleCollapse} className="p-1.5 rounded-lg dark:hover:bg-dark-500 hover:bg-light-300 transition-colors hidden md:block">
           <ChevronDown size={16} className={`dark:text-dark-200 text-dark-600 transition-transform ${collapsed ? '-rotate-90' : 'rotate-90'}`} />
         </button>
       </div>

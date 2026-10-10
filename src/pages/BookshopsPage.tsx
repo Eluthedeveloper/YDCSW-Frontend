@@ -56,7 +56,7 @@ export function BookshopsPage(): React.ReactElement {
                 >
                   <div className="aspect-[16/10] overflow-hidden bg-muted">
                     <img
-                      src={printshops}
+                      src={shop.image ?? printshops}
                       alt={shop.name}
                       loading="lazy"
                       className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
