@@ -1,13 +1,4 @@
-/**
- * Single source of truth for the organisation's public contact details.
- *
- * These were previously copy-pasted between the footer and the contact page,
- * where the address appeared three more times inside map URLs. Correcting the
- * phone number in one place left the others stale — and the copy in the footer
- * is the one a visitor is most likely to read and act on.
- *
- * `phone` is still the placeholder it has always been. Replace it here and every
- * rendered surface follows.
+/*
  */
 export const site = {
   organisation: 'Yemisrach Dimts Communication Service',
@@ -16,10 +7,8 @@ export const site = {
   email: 'info@yemisrachdimts.org',
   /** As displayed to a reader. */
   phone: '+251 (0) 11 321 0134',
-  /**
-   * Dialable form for `tel:`. Stripped of spaces, punctuation and the
-   * international trunk prefix, which diallers reject.
-   */
+
+  
   phoneHref: '+2519112493368',
   mapsQuery: 'XPCJ+8Q9, Guinea Bissau St, Addis Ababa, Ethiopia',
 } as const;

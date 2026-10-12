@@ -7,7 +7,7 @@ import { site } from "../lib/site";
 const SOCIAL_LINKS = [
   {
     name: "YouTube",
-    href: "https://youtube.com/@yemisrachdimts",
+    href: "https://youtube.com/@Yemisrachdimtsradio",
     color: "#FF0000",
     icon: (
       <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
@@ -47,7 +47,7 @@ const SOCIAL_LINKS = [
   },
   {
     name: "WhatsApp",
-    href: "https://wa.me/251911000000",
+    href: "https://wa.me/251944088425",
     color: "#25D366",
     icon: (
       <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">

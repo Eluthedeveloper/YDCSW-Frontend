@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { usePlayerAuth } from '../context/AuthContext';
 import { usePlayer } from '../context/PlayerContext';
 import { api } from '../utils/api';
+import { compressImage } from '../../lib/compressImage';
 import CoverBg from '../components/CoverBg';
 import BulkUploadModal from '../components/BulkUploadModal';
 import { toast } from 'sonner';
@@ -32,6 +33,8 @@ export default function ProgramsPage() {
   const [trackForm, setTrackForm] = useState({ title: '', artist: '', album: '', track_type: 'episode' });
   const [trackFile, setTrackFile] = useState<File | null>(null);
   const [detectingMeta, setDetectingMeta] = useState(false);
+  const [trackProgress, setTrackProgress] = useState<number | null>(null);
+  const [coverProgress, setCoverProgress] = useState<number | null>(null);
   const [editingTrackId, setEditingTrackId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ title: '', artist: '', album: '', track_type: '' });
   const [editingProgram, setEditingProgram] = useState<Program | null>(null);
@@ -80,12 +83,13 @@ export default function ProgramsPage() {
   const createProgram = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreating(true);
+    setCoverProgress(coverFile ? 0 : null);
     try {
       const fd = new FormData();
       fd.append('title', form.title);
       fd.append('description', form.description);
-      if (coverFile) fd.append('cover_image', coverFile);
-      await api.createProgram(fd);
+      if (coverFile) fd.append('cover_image', await compressImage(coverFile));
+      await api.createProgram(fd, coverFile ? setCoverProgress : undefined);
       setShowCreate(false);
       setForm({ title: '', description: '' });
       setCoverFile(null);
@@ -93,7 +97,7 @@ export default function ProgramsPage() {
       toast.success('Program created successfully');
     } catch (err: unknown) {
       toast.error(errorMessage(err, 'Failed to create program'));
-    } finally { setCreating(false); }
+    } finally { setCreating(false); setCoverProgress(null); }
   };
 
   const deleteProgram = async (id: string) => {
@@ -138,12 +142,13 @@ export default function ProgramsPage() {
     e.preventDefault();
     if (!editingProgram) return;
     setCreating(true);
+    setCoverProgress(editCoverFile ? 0 : null);
     try {
       const fd = new FormData();
       fd.append('title', editProgramForm.title);
       fd.append('description', editProgramForm.description);
-      if (editCoverFile) fd.append('cover_image', editCoverFile);
-      await api.updateProgram(editingProgram.id, fd);
+      if (editCoverFile) fd.append('cover_image', await compressImage(editCoverFile));
+      await api.updateProgram(editingProgram.id, fd, editCoverFile ? setCoverProgress : undefined);
       setEditingProgram(null);
       setEditProgramForm({ title: '', description: '' });
       setEditCoverFile(null);
@@ -151,7 +156,7 @@ export default function ProgramsPage() {
       toast.success('Program updated successfully');
     } catch (err: unknown) {
       toast.error(errorMessage(err, 'Failed to update program'));
-    } finally { setCreating(false); }
+    } finally { setCreating(false); setCoverProgress(null); }
   };
 
   // --- Single Upload ---
@@ -175,15 +180,21 @@ export default function ProgramsPage() {
     e.preventDefault();
     if (!trackFile || !selectedProgram) return;
     setCreating(true);
+    setTrackProgress(0);
     try {
-      const fd = new FormData();
-      fd.append('title', trackForm.title);
-      fd.append('artist', trackForm.artist);
-      fd.append('album', trackForm.album);
-      fd.append('track_type', trackForm.track_type);
-      fd.append('program_id', selectedProgram);
-      fd.append('audio_file', trackFile);
-      await api.createTrack(fd);
+      // Chunked + resumable: a network drop mid-file costs one 5 MB chunk,
+      // not the whole upload, and the bar reflects real bytes sent.
+      await api.uploadTrackResumable(
+        trackFile,
+        {
+          title: trackForm.title,
+          artist: trackForm.artist,
+          album: trackForm.album,
+          program_id: selectedProgram,
+          track_type: trackForm.track_type,
+        },
+        setTrackProgress
+      );
       setShowUploadTrack(false);
       setTrackForm({ title: '', artist: '', album: '', track_type: 'episode' });
       setTrackFile(null);
@@ -192,7 +203,7 @@ export default function ProgramsPage() {
       toast.success('Track uploaded successfully');
     } catch (err: unknown) {
       toast.error(errorMessage(err, 'Failed to upload track'));
-    } finally { setCreating(false); }
+    } finally { setCreating(false); setTrackProgress(null); }
   };
 
   // --- Bulk Upload ---
@@ -398,7 +409,9 @@ export default function ProgramsPage() {
                </div>
                <button type="submit" disabled={creating} className="w-full py-3 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-medium rounded-lg transition-all flex items-center justify-center gap-2">
                 {creating ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-                {creating ? 'Creating...' : 'Create Program'}
+                {creating
+                  ? (coverProgress !== null && coverProgress < 100 ? `Uploading… ${coverProgress}%` : 'Creating...')
+                  : 'Create Program'}
               </button>
             </form>
           </div>
@@ -443,7 +456,9 @@ export default function ProgramsPage() {
                </div>
                <button type="submit" disabled={creating} className="w-full py-3 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-medium rounded-lg transition-all flex items-center justify-center gap-2">
                 {creating ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-                {creating ? 'Saving...' : 'Save Changes'}
+                {creating
+                  ? (coverProgress !== null && coverProgress < 100 ? `Uploading… ${coverProgress}%` : 'Saving...')
+                  : 'Save Changes'}
               </button>
             </form>
           </div>
@@ -462,10 +477,22 @@ export default function ProgramsPage() {
               <div className="py-4">
                 <div className="flex items-center justify-center gap-3 mb-4">
                   <Loader2 size={20} className="animate-spin text-primary-400" />
-                  <span className="text-sm dark:text-dark-200 text-dark-600">Uploading track...</span>
+                  <span className="text-sm dark:text-dark-200 text-dark-600">
+                    {trackProgress === null ? 'Uploading track…' : `Uploading track… ${trackProgress}%`}
+                  </span>
                 </div>
-                <div className="h-2 dark:bg-dark-600 bg-light-200 rounded-full overflow-hidden">
-                  <div className="h-full bg-primary-600 rounded-full animate-[indeterminate_1.5s_ease-in-out_infinite]" style={{ width: '40%' }} />
+                <div
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={trackProgress ?? 0}
+                  aria-label="Track upload progress"
+                  className="h-2 dark:bg-dark-600 bg-light-200 rounded-full overflow-hidden"
+                >
+                  <div
+                    className="h-full bg-primary-600 rounded-full transition-all"
+                    style={{ width: `${trackProgress ?? 0}%` }}
+                  />
                 </div>
               </div>
             ) : (

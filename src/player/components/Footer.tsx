@@ -13,9 +13,9 @@ export default function Footer() {
           </div>
 
           <div className="flex items-center gap-6">
-            <a href="tel:+251911000000" className="flex items-center gap-2 text-sm dark:text-dark-200 text-dark-600 hover:text-primary-400 transition-colors">
+            <a href="tel:+251 11 321 0134" className="flex items-center gap-2 text-sm dark:text-dark-200 text-dark-600 hover:text-primary-400 transition-colors">
               <Phone size={14} />
-              <span>+251 911 000 000</span>
+              <span>+251 911 321 0134</span>
             </a>
             <a href="mailto:info@yemisrachdimts.com" className="flex items-center gap-2 text-sm dark:text-dark-200 text-dark-600 hover:text-primary-400 transition-colors">
               <Mail size={14} />

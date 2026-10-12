@@ -84,7 +84,19 @@ function errorTextFrom(json: { value: unknown }): string | undefined {
 }
 
 /** Multipart upload helper: no Content-Type, so the browser sets the boundary. */
-async function formRequest<T>(endpoint: string, data: FormData, method: 'POST' | 'PUT' = 'POST'): Promise<T> {
+async function formRequest<T>(
+  endpoint: string,
+  data: FormData,
+  method: 'POST' | 'PUT' = 'POST',
+  onProgress?: (percent: number) => void
+): Promise<T> {
+  // `fetch` exposes no upload-progress events, so any caller that wants a
+  // progress bar has to go through XHR. Without a callback the plain fetch
+  // path is kept for calls that do not need one.
+  if (onProgress) {
+    return formRequestWithProgress<T>(endpoint, data, onProgress, method);
+  }
+
   let res: Response;
   try {
     res = await fetch(`${API_BASE}${endpoint}`, {
@@ -130,7 +142,7 @@ export interface BulkUploadResult {
  * `fetch` exposes no upload-progress events, so a batch of audio — up to 50
  * files, and nginx allows 200 MB per request — could sit behind a spinner with
  * no feedback for minutes. XHR is the only browser transport that reports bytes
- * sent, and it can still send the session cookie, so only this one call uses it.
+ * sent, and it can still send the session cookie, so only uploads use it.
  *
  * The resolution and rejection values deliberately match `formRequest`, so the
  * caller cannot tell the two apart except by the progress callback.
@@ -138,11 +150,12 @@ export interface BulkUploadResult {
 function formRequestWithProgress<T>(
   endpoint: string,
   data: FormData,
-  onProgress: (percent: number) => void
+  onProgress: (percent: number) => void,
+  method: 'POST' | 'PUT' = 'POST'
 ): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', `${API_BASE}${endpoint}`);
+    xhr.open(method, `${API_BASE}${endpoint}`);
     // Matches `credentials: 'include'` on every other call.
     xhr.withCredentials = true;
 
@@ -188,6 +201,154 @@ function formRequestWithProgress<T>(
   });
 }
 
+// ---------------------------------------------------------------------------
+// Chunked, resumable audio upload.
+//
+// A single multi-minute POST over a slow or lossy link dies on any blip and
+// restarts from zero. Splitting into ~5 MB chunks means a drop costs one chunk,
+// and `status` lets a retried call skip parts the server already has. The
+// chunk size itself comes from the server's init response so the two sides
+// can never disagree.
+// ---------------------------------------------------------------------------
+
+const CHUNK_RETRIES = 3;
+
+interface ChunkInitResponse {
+  upload_id: string;
+  chunk_size: number;
+  chunk_count: number;
+  received: number[];
+}
+
+export interface TrackUploadMeta {
+  title: string;
+  artist?: string;
+  album?: string;
+  program_id: string;
+  track_type?: string;
+  duration?: number;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function sendChunk(uploadId: string, index: number, blob: Blob): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${API_BASE}/tracks/upload/chunk/${uploadId}/${index}`);
+    xhr.withCredentials = true;
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve();
+        return;
+      }
+      let message = `Chunk ${index} failed (HTTP ${xhr.status})`;
+      try {
+        const parsed = JSON.parse(xhr.responseText) as { error?: string };
+        if (parsed.error) message = parsed.error;
+      } catch {
+        // Non-JSON error body — keep the status message.
+      }
+      reject(new ApiError(message, xhr.status));
+    });
+    xhr.addEventListener('error', () =>
+      reject(new Error('Network error. Please check your connection.'))
+    );
+    xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
+    xhr.send(blob);
+  });
+}
+
+/**
+ * Uploads one audio file via the chunked endpoints.
+ *
+ * `onProgress` is overall percent of this file's bytes (already-resumed chunks
+ * count as done). Safe to call again after a failure: the server's `status`
+ * endpoint lists chunks it already holds, so the retry continues from there.
+ */
+export async function uploadTrackResumable(
+  file: File,
+  meta: TrackUploadMeta,
+  onProgress: (percent: number) => void
+): Promise<Track> {
+  const init = await request<ChunkInitResponse>('/tracks/upload/init', {
+    method: 'POST',
+    body: JSON.stringify({
+      original_name: file.name,
+      size: file.size,
+      mime_type: file.type || 'audio/mpeg',
+    }),
+  });
+
+  const { upload_id, chunk_size, chunk_count } = init;
+
+  // Prefer the server's list over init's empty `received` in case an earlier
+  // attempt already uploaded some parts and the client kept the upload_id.
+  let receivedSet = new Set<number>(init.received ?? []);
+  if (receivedSet.size === 0 && chunk_count > 0) {
+    try {
+      const status = await request<{ received: number[] }>(`/tracks/upload/status/${upload_id}`);
+      receivedSet = new Set(status.received);
+    } catch {
+      // Status is an optimisation; a miss just re-uploads every chunk.
+    }
+  }
+
+  const bytesOfChunk = (i: number) => Math.min(chunk_size, Math.max(0, file.size - i * chunk_size));
+  let uploadedBytes = [...receivedSet].reduce((sum, i) => sum + bytesOfChunk(i), 0);
+
+  const report = () => {
+    if (file.size > 0) {
+      onProgress(Math.min(99, Math.round((uploadedBytes / file.size) * 100)));
+    }
+  };
+  report();
+
+  for (let i = 0; i < chunk_count; i++) {
+    if (receivedSet.has(i)) continue;
+    const start = i * chunk_size;
+    const end = Math.min(start + chunk_size, file.size);
+    const blob = file.slice(start, end);
+
+    let attempt = 0;
+    for (;;) {
+      try {
+        await sendChunk(upload_id, i, blob);
+        receivedSet.add(i);
+        uploadedBytes += blob.size;
+        report();
+        break;
+      } catch (err) {
+        attempt++;
+        // A 4xx other than 429 will not get better by retrying (bad session,
+        // invalid chunk); only network errors and 5xx are worth another try.
+        const retryable =
+          err instanceof ApiError ? err.status >= 500 || err.status === 429 : true;
+        if (!retryable || attempt >= CHUNK_RETRIES) throw err;
+        await sleep(1000 * attempt);
+      }
+    }
+  }
+
+  const track = await request<Track>('/tracks/upload/finalize', {
+    method: 'POST',
+    body: JSON.stringify({
+      upload_id,
+      title: meta.title,
+      artist: meta.artist,
+      album: meta.album,
+      program_id: meta.program_id,
+      track_type: meta.track_type,
+      duration: meta.duration,
+    }),
+  });
+  onProgress(100);
+  return track;
+}
+
 export const api = {
   login: (data: { username: string; password: string }) =>
     request<{ user: AuthUser }>('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
@@ -213,12 +374,15 @@ export const api = {
   getProgram: (id: string) => request<Program>(`/programs/${id}`),
   getComments: (programId: string) => request<Comment[]>(`/programs/${programId}/comments`),
   getAllComments: () => request<Comment[]>('/programs/comments/all'),
-  createProgram: (data: FormData) => formRequest<Program>('/programs', data),
+  createProgram: (data: FormData, onProgress?: (percent: number) => void) =>
+    formRequest<Program>('/programs', data, 'POST', onProgress),
   deleteProgram: (id: string) => request<{ message: string }>(`/programs/${id}`, { method: 'DELETE' }),
-  updateProgram: (id: string, data: FormData) => formRequest<{ message: string }>(`/programs/${id}`, data, 'PUT'),
+  updateProgram: (id: string, data: FormData, onProgress?: (percent: number) => void) =>
+    formRequest<{ message: string }>(`/programs/${id}`, data, 'PUT', onProgress),
 
   getTracks: (programId: string) => request<Track[]>(`/tracks/program/${programId}`),
-  createTrack: (data: FormData) => formRequest<Track>('/tracks', data),
+  createTrack: (data: FormData, onProgress?: (percent: number) => void) =>
+    formRequest<Track>('/tracks', data, 'POST', onProgress),
   deleteTrack: (id: string) => request<{ message: string }>(`/tracks/${id}`, { method: 'DELETE' }),
   updateTrack: (id: string, data: TrackUpdateInput) =>
     request<{ message: string }>(`/tracks/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
@@ -227,10 +391,13 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ trackIds }),
     }),
-  bulkUploadTracks: (data: FormData) => formRequest<BulkUploadResult>('/tracks/bulk', data),
+  bulkUploadTracks: (data: FormData, onProgress?: (percent: number) => void) =>
+    formRequest<BulkUploadResult>('/tracks/bulk', data, 'POST', onProgress),
 
   bulkUploadTracksWithProgress: (data: FormData, onProgress: (percent: number) => void) =>
     formRequestWithProgress<BulkUploadResult>('/tracks/bulk', data, onProgress),
+
+  uploadTrackResumable,
 
   // ---- Site content: leadership, albums, announcements, events ----
 
@@ -242,9 +409,10 @@ export const api = {
 
   // Leaders. Create/update are multipart because a photo rides along; the
   // backend reads `req.body` the same way either way.
-  createLeader: (data: FormData) => formRequest<Leader>('/site/leaders', data),
-  updateLeader: (id: string, data: FormData) =>
-    formRequest<{ message: string }>(`/site/leaders/${id}`, data, 'PUT'),
+  createLeader: (data: FormData, onProgress?: (percent: number) => void) =>
+    formRequest<Leader>('/site/leaders', data, 'POST', onProgress),
+  updateLeader: (id: string, data: FormData, onProgress?: (percent: number) => void) =>
+    formRequest<{ message: string }>(`/site/leaders/${id}`, data, 'PUT', onProgress),
   deleteLeader: (id: string) =>
     request<{ message: string }>(`/site/leaders/${id}`, { method: 'DELETE' }),
   reorderLeaders: (ids: string[]) =>
@@ -259,8 +427,8 @@ export const api = {
     request<{ message: string }>(`/site/albums/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteAlbum: (id: string) =>
     request<{ message: string }>(`/site/albums/${id}`, { method: 'DELETE' }),
-  addAlbumPhotos: (albumId: string, data: FormData) =>
-    formRequest<{ uploaded: number }>(`/site/albums/${albumId}/photos`, data),
+  addAlbumPhotos: (albumId: string, data: FormData, onProgress?: (percent: number) => void) =>
+    formRequest<{ uploaded: number }>(`/site/albums/${albumId}/photos`, data, 'POST', onProgress),
   deleteAlbumPhoto: (albumId: string, photoId: string) =>
     request<{ message: string }>(`/site/albums/${albumId}/photos/${photoId}`, { method: 'DELETE' }),
 

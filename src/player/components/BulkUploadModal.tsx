@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { ListMusic, Loader2, X, Upload } from 'lucide-react';
-import { api } from '../utils/api';
+import { api, ApiError } from '../utils/api';
 import { readAudioMetadata } from '../utils/metadata';
 import { errorMessage } from '../utils/errors';
 import type { Track } from '../utils/types';
 
-/** The backend's multer array limit for a single bulk request. */
+/** The backend's multer array limit for a single bulk request (kept in sync
+ *  with the sequential client cap so the UI and API agree). */
 const MAX_BULK_FILES = 50;
+const PER_FILE_RETRIES = 2;
 
 interface BulkItem {
   file: File;
@@ -20,24 +22,33 @@ interface Props {
   onUploaded: () => void;
 }
 
+function fileKey(item: BulkItem): string {
+  return `${item.file.name}:${item.file.size}:${item.file.lastModified}`;
+}
+
 /**
  * Bulk track upload dialog.
  *
- * All files go out in one request: the single-upload endpoint is rate limited
- * per IP, so a batch sent file-by-file would start failing partway through.
+ * Files go out one at a time through the chunked, resumable endpoint. The old
+ * design packed up to 50 files into a single multipart POST: any network blip
+ * (common on a slow uplink) lost the whole batch, and there was no way to
+ * resume. Sequential per-file upload means a failure only costs the current
+ * file, already-finished files stay committed on the server, and a retry
+ * re-sends only what is left.
  */
 export default function BulkUploadModal({ programId, onUploaded }: Props) {
   const [files, setFiles] = useState<BulkItem[]>([]);
   const [detecting, setDetecting] = useState(false);
   const [trackType, setTrackType] = useState('episode');
   const [uploading, setUploading] = useState(false);
-  // Byte progress, 0-100. This used to count files with a `done` field that
-  // nothing ever incremented, so the bar sat at 0% for the whole upload.
+  // Overall byte progress across the whole batch, 0-100.
   const [percent, setPercent] = useState(0);
+  const [currentLabel, setCurrentLabel] = useState<string | null>(null);
 
   const reset = () => {
     setFiles([]);
     setPercent(0);
+    setCurrentLabel(null);
   };
 
   const close = () => {
@@ -76,33 +87,85 @@ export default function BulkUploadModal({ programId, onUploaded }: Props) {
 
   const upload = async () => {
     if (files.length === 0) return;
-    const count = files.length;
     setUploading(true);
     setPercent(0);
 
-    try {
-      const fd = new FormData();
-      for (const item of files) {
-        fd.append('titles', item.meta.title || item.file.name.replace(/\.[^.]+$/, ''));
-        fd.append('artists', item.meta.artist);
-        fd.append('albums', item.meta.album);
-        fd.append('audio_files', item.file);
-      }
-      fd.append('track_type', trackType);
-      fd.append('program_id', programId);
+    const totalBytes = files.reduce((sum, item) => sum + item.file.size, 0);
+    const done = new Set<string>();
+    let completedBytes = 0;
+    let failedItem: BulkItem | null = null;
+    let failedError: unknown = null;
 
-      await api.bulkUploadTracksWithProgress(fd, setPercent);
-      reset();
-      onUploaded();
-      toast.success(`Uploaded ${count} track${count === 1 ? '' : 's'}`);
-    } catch (err: unknown) {
-      toast.error(errorMessage(err, 'Failed to upload tracks'));
-      // Leave the bar where it stalled so the number still reflects how far the
-      // request actually got; it resets on the next attempt.
-      setPercent(0);
-    } finally {
-      setUploading(false);
+    for (let i = 0; i < files.length; i++) {
+      const item = files[i]!;
+      setCurrentLabel(item.file.name);
+
+      let attempt = 0;
+      let succeeded = false;
+      for (;;) {
+        try {
+          await api.uploadTrackResumable(
+            item.file,
+            {
+              title: item.meta.title || item.file.name.replace(/\.[^.]+$/, ''),
+              artist: item.meta.artist,
+              album: item.meta.album,
+              program_id: programId,
+              track_type: trackType,
+            },
+            (filePercent) => {
+              const fileBytes = item.file.size * (filePercent / 100);
+              const overall =
+                totalBytes > 0
+                  ? Math.round(((completedBytes + fileBytes) / totalBytes) * 100)
+                  : 0;
+              setPercent(Math.min(overall, 99));
+            }
+          );
+          succeeded = true;
+          break;
+        } catch (err) {
+          // The chunked helper already retried transient failures. A remaining
+          // ApiError (4xx) will not improve by resending the same request.
+          const retryable = !(err instanceof ApiError) || err.status >= 500 || err.status === 429;
+          attempt++;
+          if (!retryable || attempt > PER_FILE_RETRIES) {
+            failedItem = item;
+            failedError = err;
+            break;
+          }
+          setCurrentLabel(`${item.file.name} (retry ${attempt}/${PER_FILE_RETRIES})…`);
+          await new Promise((r) => setTimeout(r, 1500 * attempt));
+        }
+      }
+
+      if (!succeeded) break;
+      done.add(fileKey(item));
+      completedBytes += item.file.size;
+      setPercent(totalBytes > 0 ? Math.round((completedBytes / totalBytes) * 100) : 100);
     }
+
+    setCurrentLabel(null);
+    setUploading(false);
+
+    // Drop finished files from the list so a retry only sends the remainder.
+    const remaining = files.filter((item) => !done.has(fileKey(item)));
+    if (done.size > 0) {
+      setFiles(remaining);
+      onUploaded();
+    }
+
+    if (failedItem && failedError) {
+      toast.error(
+        errorMessage(failedError, `Failed to upload "${failedItem.file.name}"`) +
+          (done.size > 0 ? ` ${done.size} earlier track${done.size === 1 ? '' : 's'} were saved.` : '')
+      );
+      setPercent(0);
+      return;
+    }
+
+    reset();
+    toast.success(`Uploaded ${files.length} track${files.length === 1 ? '' : 's'}`);
   };
 
   return (
@@ -210,7 +273,7 @@ export default function BulkUploadModal({ programId, onUploaded }: Props) {
           {uploading && (
             <div className="mb-4">
               <div className="flex justify-between text-xs dark:text-dark-200 text-dark-600 mb-1">
-                <span>Uploading {files.length} track{files.length !== 1 ? 's' : ''}…</span>
+                <span className="truncate mr-2">{currentLabel || 'Uploading…'}</span>
                 <span>{percent}%</span>
               </div>
               <div

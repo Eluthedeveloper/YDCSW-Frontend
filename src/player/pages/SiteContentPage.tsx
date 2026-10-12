@@ -2,6 +2,7 @@ import { errorMessage } from '../utils/errors';
 import { useState, useEffect } from 'react';
 import { usePlayerAuth } from '../context/AuthContext';
 import { api, uploadUrl } from '../utils/api';
+import { compressImage, compressImages } from '../../lib/compressImage';
 import { toast } from 'sonner';
 import {
   Users, Images, Megaphone, CalendarDays, Plus, Trash2, X, Loader2,
@@ -65,6 +66,7 @@ export default function SiteContentPage() {
   const [tab, setTab] = useState<Tab>('leaders');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadPercent, setUploadPercent] = useState<number | null>(null);
 
   const [leaders, setLeaders] = useState<Leader[]>([]);
   const [albums, setAlbums] = useState<Album[]>([]);
@@ -128,8 +130,11 @@ export default function SiteContentPage() {
 
   const checkImage = (file: File | null | undefined): file is File => {
     if (!file) return false;
+    // Cap applies to the compressed result, not the camera original: a 20 MB
+    // phone photo is fine once it has been resized, so rejecting on the raw
+    // size would block the exact case compression exists to fix.
     if (file.size > MAX_IMAGE_BYTES) {
-      toast.error(`Image is too large. Max is ${MAX_IMAGE_MB} MB.`);
+      toast.error(`Image is too large even after compression. Max is ${MAX_IMAGE_MB} MB.`);
       return false;
     }
     return true;
@@ -154,25 +159,26 @@ export default function SiteContentPage() {
   const saveLeader = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    setUploadPercent(leaderPhoto ? 0 : null);
     try {
       const fd = new FormData();
       fd.append('name', leaderForm.name);
       fd.append('title', leaderForm.title);
       fd.append('quote', leaderForm.quote);
       fd.append('role_label', leaderForm.role_label);
-      if (leaderPhoto) fd.append('photo', leaderPhoto);
+      if (leaderPhoto) fd.append('photo', await compressImage(leaderPhoto));
       if (editingLeader) {
-        await api.updateLeader(editingLeader.id, fd);
+        await api.updateLeader(editingLeader.id, fd, leaderPhoto ? setUploadPercent : undefined);
         toast.success('Leader updated');
       } else {
-        await api.createLeader(fd);
+        await api.createLeader(fd, leaderPhoto ? setUploadPercent : undefined);
         toast.success('Leader added');
       }
       closeLeaderForm();
       loadLeaders();
     } catch (err: unknown) {
       toast.error(errorMessage(err, 'Failed to save leader'));
-    } finally { setSaving(false); }
+    } finally { setSaving(false); setUploadPercent(null); }
   };
 
   const deleteLeader = (leader: Leader) => {
@@ -242,20 +248,25 @@ export default function SiteContentPage() {
 
   const addAlbumPhotos = async (album: Album, files: FileList | null) => {
     if (!files || files.length === 0) return;
-    for (const file of Array.from(files)) {
-      if (!checkImage(file)) return;
-    }
     setSaving(true);
+    setUploadPercent(0);
     try {
+      // Compress one at a time so a 30-photo batch does not spawn 30 canvases
+      // at once; each result is typically a fraction of the original size.
+      const compressed = await compressImages(Array.from(files));
+      for (const file of compressed) {
+        if (!checkImage(file)) return;
+      }
       const fd = new FormData();
-      for (const file of Array.from(files)) fd.append('photos', file);
-      const result = await api.addAlbumPhotos(album.id, fd);
+      for (const file of compressed) fd.append('photos', file);
+      const result = await api.addAlbumPhotos(album.id, fd, setUploadPercent);
       toast.success(`${result.uploaded} photo${result.uploaded === 1 ? '' : 's'} added`);
       loadAlbums();
     } catch (err: unknown) {
       toast.error(errorMessage(err, 'Failed to add photos'));
     } finally {
       setSaving(false);
+      setUploadPercent(null);
       // Reset so re-selecting the same file fires a change event.
       const input = document.getElementById(`photos-${album.id}`) as HTMLInputElement | null;
       if (input) input.value = '';
@@ -464,7 +475,11 @@ export default function SiteContentPage() {
                 </div>
                 <button type="submit" disabled={saving} className={submitButton}>
                   {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-                  {saving ? 'Saving...' : editingLeader ? 'Save Changes' : 'Add Leader'}
+                  {saving
+                    ? (uploadPercent !== null && uploadPercent < 100
+                        ? `Uploading… ${uploadPercent}%`
+                        : 'Saving...')
+                    : editingLeader ? 'Save Changes' : 'Add Leader'}
                 </button>
               </form>
             </Modal>
@@ -497,8 +512,10 @@ export default function SiteContentPage() {
                         {album.description ? ` · ${album.description}` : ''}
                       </p>
                     </button>
-                    <label className={`${secondaryButton} cursor-pointer`}>
-                      <Upload size={14} /> Add Photos
+                    <label className={`${secondaryButton} cursor-pointer ${saving ? 'opacity-50 pointer-events-none' : ''}`}>
+                      {saving && uploadPercent !== null
+                        ? <><Loader2 size={14} className="animate-spin" /> {uploadPercent}%</>
+                        : <><Upload size={14} /> Add Photos</>}
                       <input id={`photos-${album.id}`} type="file" accept="image/*" multiple className="hidden"
                         onChange={(e) => addAlbumPhotos(album, e.target.files)} />
                     </label>

@@ -178,7 +178,7 @@ const om = {
       submit: "Xalayaa ergi →",
       sending: "deemaa jira...",
       successTitle: "Galatoomaa.",
-      successDesc: "Xalayaan keessan ergameera. Yeroo gabaabessa nuuf deebinaa.",
+      successDesc: "Xalayaan keessan ergameera. Yeroo gabaabatti isiniif deebisna.",
       ok: "Ok",
       placeholders: {
         name: "Maqaa keessan",
