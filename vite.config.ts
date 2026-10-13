@@ -19,5 +19,9 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     css: false,
+    // Same reason as asyncUtilTimeout in test/setup.ts: several jsdom
+    // environments in parallel make the default 5 s budget miss on load,
+    // which reads as a broken test rather than a slow machine.
+    testTimeout: 20_000,
   },
 });

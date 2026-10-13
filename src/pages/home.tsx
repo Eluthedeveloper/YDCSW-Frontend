@@ -11,8 +11,8 @@ import radioImg from "../assets/radio.jpg";
 import { SiteShell } from "../components/site/SiteShell";
 import { RadioSchedule } from "../components/RadioSchedule";
 import { useAsyncData } from "../player/hooks/useAsyncData";
-import { api } from "../player/utils/api";
-import type { Announcement, SiteEvent } from "../player/utils/types";
+import { api, uploadUrl } from "../player/utils/api";
+import type { Announcement, SiteEvent, BlogPost } from "../player/utils/types";
 
 function Hero() {
   const { t } = useTranslation();
@@ -252,7 +252,9 @@ function Notices() {
     { announcements: [] as Announcement[], events: [] as SiteEvent[] }
   );
 
-  const now = Date.now();
+  // Frozen at mount: the filter below only needs "now" as an upper bound for
+  // ended events, and reading the clock during render is impure.
+  const [now] = useState(() => Date.now());
   // Only events that have not finished yet; the API returns newest-dated
   // first, so slicing keeps the soonest upcoming ones.
   const upcoming = events
@@ -331,6 +333,101 @@ function Notices() {
   );
 }
 
+/**
+ * Three most recent blog posts on the homepage. Returns null when nothing is
+ * published, so an un-blogged site keeps its original layout.
+ */
+function BlogTeaser() {
+  const { t, i18n } = useTranslation();
+
+  const { data: posts } = useAsyncData<BlogPost[]>(
+    () => api.getBlogPosts().catch(() => [] as BlogPost[]),
+    []
+  );
+
+  const latest = posts.slice(0, 3);
+  if (latest.length === 0) return null;
+
+  const formatDate = (mysql?: string) => {
+    if (!mysql) return "";
+    const parsed = new Date(mysql.replace(" ", "T"));
+    return Number.isNaN(parsed.getTime())
+      ? mysql
+      : parsed.toLocaleDateString(i18n.language, { dateStyle: "medium" });
+  };
+
+  const coverOf = (post: BlogPost) =>
+    post.cover_image ? uploadUrl(`blogs/${post.cover_image}`) : null;
+
+  return (
+    <section className="bg-background py-24 lg:py-32">
+      <div className="mx-auto max-w-7xl px-6 lg:px-12">
+        <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-end">
+          <div>
+            <p className="text-xs uppercase tracking-[0.3em] text-gold">{t("home.blogTeaser.tag")}</p>
+            <h2 className="mt-4 font-serif text-4xl text-foreground sm:text-5xl">{t("home.blogTeaser.title")}</h2>
+            <p className="mt-4 max-w-md text-muted-foreground">{t("home.blogTeaser.sub")}</p>
+          </div>
+          <Link
+            to="/blog"
+            className="inline-flex items-center gap-2 rounded-full border border-border px-6 py-3 text-sm font-semibold text-foreground transition hover:border-gold hover:text-gold"
+          >
+            {t("home.blogTeaser.viewAll")}
+            <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth="2">
+              <path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </Link>
+        </div>
+
+        <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {latest.map((post) => {
+            const cover = coverOf(post);
+            return (
+              <article key={post.id} className="group overflow-hidden rounded-2xl bg-card shadow-[var(--shadow-elegant)] transition hover:-translate-y-1">
+                <Link to={`/blog/${post.slug}`} className="relative block aspect-[16/10] overflow-hidden">
+                  {cover ? (
+                    <img src={cover} alt="" loading="lazy" className="h-full w-full object-cover transition duration-700 group-hover:scale-105" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-[image:var(--gradient-divine)]">
+                      <span className="font-serif text-3xl text-gold">YDCS</span>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-primary/70 via-transparent to-transparent" />
+                  {post.category && (
+                    <span className="absolute left-4 top-4 rounded-full bg-primary/80 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-gold backdrop-blur">
+                      {post.category}
+                    </span>
+                  )}
+                </Link>
+                <div className="p-6">
+                  <p className="text-xs uppercase tracking-widest text-muted-foreground/70">{formatDate(post.created_at)}</p>
+                  <h3 className="mt-3 font-serif text-2xl leading-snug text-foreground">
+                    <Link to={`/blog/${post.slug}`} className="transition group-hover:text-gold">
+                      {post.title}
+                    </Link>
+                  </h3>
+                  {post.excerpt && (
+                    <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-muted-foreground">{post.excerpt}</p>
+                  )}
+                  <Link
+                    to={`/blog/${post.slug}`}
+                    className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-gold transition group-hover:gap-3"
+                  >
+                    {t("home.blogTeaser.readMore")}
+                    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth="2">
+                      <path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </Link>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function CTA() {
   const { t } = useTranslation();
   return (
@@ -369,6 +466,7 @@ export function HomePage(): React.ReactElement {
         <Hero />
         <Verse />
         <Notices />
+        <BlogTeaser />
         <RadioHighlight />
         <ProgramsCTA />
         <Ministries />

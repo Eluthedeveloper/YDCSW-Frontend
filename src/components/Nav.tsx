@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import logo from "../assets/Logo.png";
+import NotificationBell from "./NotificationBell";
 
 export function Nav(): React.ReactElement {
   const { t, i18n } = useTranslation();
@@ -96,23 +97,27 @@ export function Nav(): React.ReactElement {
     { code: "om", label: "OR" },
   ];
 
-  const languageButtons = (
-    <div className="flex items-center rounded-full border border-background/15 p-0.5">
-      {LANGUAGES.map(({ code, label }) => (
-        <button
-          key={code}
-          onClick={() => changeLanguage(code)}
-          aria-label={`Switch language to ${label}`}
-          className={`rounded-full px-2.5 py-1 text-xs font-semibold tracking-wide transition ${
-            i18n.language === code
-              ? "bg-gold text-gold-foreground shadow-sm"
-              : "text-background/70 hover:text-gold"
-          }`}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
+  // A compact select rather than a row of three buttons: the header was
+  // getting crowded, and a native select also opens the language menu from
+  // the mobile drawer without extra state.
+  const languageSelect = (
+    <>
+      <label htmlFor="site-language" className="sr-only">
+        {t("nav.language")}
+      </label>
+      <select
+        id="site-language"
+        value={i18n.resolvedLanguage || "en"}
+        onChange={(e) => changeLanguage(e.target.value)}
+        className="cursor-pointer rounded-full border border-background/15 bg-transparent px-2 py-1 text-xs font-semibold tracking-wide text-background/80 transition hover:border-gold/40 hover:text-gold focus:border-gold focus:outline-none"
+      >
+        {LANGUAGES.map(({ code, label }) => (
+          <option key={code} value={code} className="bg-primary text-background">
+            {label}
+          </option>
+        ))}
+      </select>
+    </>
   );
 
   return (
@@ -211,6 +216,16 @@ export function Nav(): React.ReactElement {
               {t("nav.programs")}
             </NavLink>
           </li>
+          <li>
+            <NavLink
+              to="/blog"
+              className={({ isActive }) =>
+                `transition hover:text-gold ${isActive ? "text-gold" : ""}`
+              }
+            >
+              {t("nav.blog")}
+            </NavLink>
+          </li>
           <li className="relative" data-dept-dropdown>
             <button
               onClick={() => setDeptOpen((p) => !p)}
@@ -263,6 +278,8 @@ export function Nav(): React.ReactElement {
         </ul>
 
         <div className="flex items-center gap-3">
+          <NotificationBell />
+
           <Link
             to="/contact"
             className="hidden rounded-full bg-gold px-4 py-1.5 text-xs font-semibold text-gold-foreground shadow-[var(--shadow-gold)] transition hover:scale-105 lg:inline-block"
@@ -270,13 +287,8 @@ export function Nav(): React.ReactElement {
             {t("nav.partner")}
           </Link>
 
-          <div className="hidden lg:block">
-            {languageButtons}
-          </div>
-
-          <div className="lg:hidden">
-            {languageButtons}
-          </div>
+          {/* One compact select serves both desktop and the mobile bar. */}
+          {languageSelect}
 
           <button
             onClick={() => setMobileOpen(true)}
@@ -320,15 +332,18 @@ export function Nav(): React.ReactElement {
                   </span>
                 </div>
               </Link>
-              <button
-                onClick={closeMobile}
-                aria-label="Close menu"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-gold/30 text-gold transition hover:bg-gold hover:text-gold-foreground"
-              >
-                <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
+              <div className="flex items-center gap-2">
+                <NotificationBell className="border border-gold/25" />
+                <button
+                  onClick={closeMobile}
+                  aria-label="Close menu"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-gold/30 text-gold transition hover:bg-gold hover:text-gold-foreground"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                    <path d="M6 6l12 12M18 6L6 18" />
+                  </svg>
+                </button>
+              </div>
             </div>
 
             {/* Scrollable navigation */}
@@ -412,6 +427,18 @@ export function Nav(): React.ReactElement {
                 }
               >
                 {t("nav.programs")}
+              </NavLink>
+
+              <NavLink
+                to="/blog"
+                onClick={closeMobile}
+                className={({ isActive }) =>
+                  `block rounded-lg px-4 py-2.5 text-sm font-medium transition hover:bg-gold/10 hover:text-gold ${
+                    isActive ? "text-gold" : "text-background/80"
+                  }`
+                }
+              >
+                {t("nav.blog")}
               </NavLink>
 
               {/* Divisions with submenu */}

@@ -166,6 +166,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     audio.addEventListener('canplay', () => setIsBuffering(false));
     audio.addEventListener('stalled', () => setIsBuffering(true));
 
+    // The element is the single source of truth for playing state. Relying
+    // only on optimistic React writes desynced after a production 429 or a
+    // rejected play() while buffered audio kept running — the toggle then
+    // called resume() instead of pause(), so clicking pause did nothing.
+    audio.addEventListener('play', () => setIsPlaying(true));
+    audio.addEventListener('pause', () => setIsPlaying(false));
+
     return () => {
       audio.pause();
       audio.removeAttribute('src');
@@ -228,10 +235,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         void audioContextRef.current.resume();
       }
       audioRef.current.play()
-        .then(() => setIsPlaying(true))
-        .catch((err: unknown) => console.error('Playback failed:', err));
+        .catch((err: unknown) => {
+          // Same treatment as play(): a silent console.error left the resume
+          // button looking dead with nothing on screen explaining why.
+          console.error('Playback failed:', err);
+          setIsBuffering(false);
+          setPlaybackError(classifyMediaError());
+        });
     }
-  }, [initAudioContext]);
+  }, [initAudioContext, classifyMediaError]);
 
   const close = useCallback(() => {
     if (audioRef.current) {

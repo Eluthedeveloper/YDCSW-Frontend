@@ -297,3 +297,14 @@ input[type="range"]::-moz-range-thumb {
 ::-webkit-scrollbar-thumb { background: #373a40; border-radius: 3px; }
 html.light ::-webkit-scrollbar-thumb { background: #ccc; }
 ::-webkit-scrollbar-thumb:hover { background: #5c5f66; }
+
+/* Notification bell: the glow pulses while there is something unseen, so the
+   button reads as "attention" even before the badge is noticed. */
+@keyframes bell-blink {
+  0%, 100% { box-shadow: 0 0 0 0 oklch(0.72 0.13 75 / 0.55); transform: scale(1); }
+  50% { box-shadow: 0 0 0 7px oklch(0.72 0.13 75 / 0); transform: scale(1.06); }
+}
+
+.animate-bell-blink {
+  animation: bell-blink 1.4s ease-in-out infinite;
+}

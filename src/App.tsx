@@ -28,6 +28,8 @@ const LeadershipPage = lazy(() => import("./pages/leadership").then((m) => ({ de
 const ServicesPage = lazy(() => import("./pages/services").then((m) => ({ default: m.ServicesPage })));
 const ResourceMobilizationPage = lazy(() => import("./pages/ResourceMobilizationPage").then((m) => ({ default: m.ResourceMobilizationPage })));
 const BookshopsPage = lazy(() => import("./pages/BookshopsPage").then((m) => ({ default: m.BookshopsPage })));
+const BlogPage = lazy(() => import("./pages/blog").then((m) => ({ default: m.BlogPage })));
+const BlogPostPage = lazy(() => import("./pages/blog").then((m) => ({ default: m.BlogPostPage })));
 
 const PublicHomePage = lazy(() => import("./player/pages/PublicHomePage"));
 const PublicProgramsPage = lazy(() => import("./player/pages/PublicProgramsPage"));
@@ -43,6 +45,7 @@ const PlayerCommentsPage = lazy(() => import("./player/pages/CommentsPage"));
 const PlayerUsersPage = lazy(() => import("./player/pages/UsersPage"));
 const PlayerAccountSettingsPage = lazy(() => import("./player/pages/AccountSettingsPage"));
 const PlayerSiteContentPage = lazy(() => import("./player/pages/SiteContentPage"));
+const PlayerBlogPage = lazy(() => import("./player/pages/BlogAdminPage"));
 
 /**
  * Shell shown while a split chunk loads. Styled to sit inside both the admin
@@ -67,6 +70,7 @@ const ADMIN_PAGES: Record<string, React.ReactNode> = {
   programs: <PlayerProgramsPage />,
   player: <PlayerAdminPage />,
   site: <PlayerSiteContentPage />,
+  blog: <PlayerBlogPage />,
   analytics: <PlayerAnalyticsPage />,
   comments: <PlayerCommentsPage />,
   users: <PlayerUsersPage />,
@@ -189,6 +193,8 @@ function AppRoutes() {
       <Route path="/leadership" element={<LeadershipPage />} />
       <Route path="/services" element={<ServicesPage />} />
       <Route path="/bookshops" element={<BookshopsPage />} />
+      <Route path="/blog" element={<BlogPage />} />
+      <Route path="/blog/:slug" element={<BlogPostPage />} />
       <Route path="/admin" element={<Navigate to="/admin/player" replace />} />
 
       {/* Player Public Routes */}

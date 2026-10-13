@@ -19,7 +19,7 @@ const MAX_COVER_MB = MAX_COVER_BYTES / (1024 * 1024);
 
 export default function ProgramsPage() {
   const { isSuperAdmin } = usePlayerAuth();
-  const { play, currentTrack, isPlaying } = usePlayer();
+  const { play, pause, resume, currentTrack, isPlaying } = usePlayer();
   const [programs, setPrograms] = useState<Program[]>([]);
   const [selectedProgram, setSelectedProgram] = useState<string | null>(null);
   const [tracks, setTracks] = useState<Track[]>([]);
@@ -337,7 +337,11 @@ export default function ProgramsPage() {
                      <button onClick={() => moveTrack(i, 'down')} disabled={i === tracks.length - 1}
                        className="p-0.5 dark:text-dark-400 text-dark-500 dark:hover:text-white hover:text-dark-900 disabled:opacity-20 disabled:cursor-not-allowed"><ChevronDown size={13} /></button>
                   </div>
-                  <button onClick={() => play(t, tracks)}
+                  <button onClick={() => {
+                      if (currentTrack?.id === t.id && isPlaying) pause();
+                      else if (currentTrack?.id === t.id && !isPlaying) resume();
+                      else play(t, tracks);
+                    }}
                     className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${
                       currentTrack?.id === t.id && isPlaying ? 'bg-primary-600 text-white' : 'bg-primary-600/20 text-primary-400 hover:bg-primary-600 hover:text-white'
                     }`}>

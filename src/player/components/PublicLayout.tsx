@@ -2,9 +2,10 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Home, FolderOpen, Music, Search, Menu, X, ArrowLeft } from 'lucide-react';
+import { Home, FolderOpen, Music, Search, Menu, X, ArrowLeft, Newspaper } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 import Footer from './Footer';
+import NotificationBell from '../../components/NotificationBell';
 
 interface Props {
   children: ReactNode;
@@ -21,6 +22,7 @@ export default function PublicLayout({ children }: Props) {
     { id: '/programs/all', label: t('publicNav.programs'), icon: FolderOpen },
     { id: '/programs/latest', label: t('publicNav.latestTracks'), icon: Music },
     { id: '/programs/search', label: t('publicNav.search'), icon: Search },
+    { id: '/blog', label: t('publicNav.blog'), icon: Newspaper },
   ];
 
   const isActive = (path: string) => {
@@ -59,6 +61,7 @@ export default function PublicLayout({ children }: Props) {
             </nav>
           </div>
           <div className="flex items-center gap-2">
+            <NotificationBell variant="panel" />
             <ThemeToggle />
             <button onClick={() => navigate('/admin/player')}
               className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium dark:text-dark-200 text-dark-600 hover:text-primary-400 dark:hover:bg-dark-500/50 hover:bg-light-300/50 transition-all border dark:border-white/10 border-dark-300">

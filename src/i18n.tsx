@@ -12,6 +12,15 @@ i18n
   .use(initReactI18next)
   .init({
     fallbackLng: "en",
+    // No navigator sniffing in the detection order: the site opens in English
+    // every time until the visitor picks a language themselves, and that pick
+    // is what gets remembered in localStorage.
+    supportedLngs: ["en", "am", "om"],
+    detection: {
+      order: ["localStorage"],
+      lookupLocalStorage: "yd_lang",
+      caches: ["localStorage"],
+    },
     debug: false,
     interpolation: { escapeValue: false },
     resources: {

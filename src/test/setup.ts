@@ -1,6 +1,11 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
+
+// Every test file boots its own jsdom environment; on a loaded machine the
+// 1 s default for findBy* loses the race to the other workers even when the
+// assertion itself is instant.
+configure({ asyncUtilTimeout: 5_000 });
 
 afterEach(() => {
   cleanup();

@@ -124,3 +124,30 @@ export interface SiteEvent {
   ends_at?: string | null;
   created_at?: string;
 }
+
+export interface BlogPost {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt?: string | null;
+  body?: string | null;
+  category?: string | null;
+  cover_image?: string | null;
+  /** Extra photos shown inside the article, filenames under uploads/blogs. */
+  images?: string[];
+  published: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** One entry of the merged "what's new" feed behind the notification bell. */
+export interface WhatsNewItem {
+  id: string;
+  type: 'blog' | 'announcement' | 'event';
+  title: string;
+  summary?: string | null;
+  /** Cover filename under uploads/blogs; null for announcements and events. */
+  image?: string | null;
+  url: string;
+  published_at: string;
+}

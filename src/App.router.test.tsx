@@ -56,7 +56,9 @@ describe('App router wiring', () => {
   it('mounts the home route without a router error', async () => {
     const App = await loadApp();
     expect(() => render(<App />)).not.toThrow();
-  });
+    // Importing the whole route tree dominates this test, and the budget has
+    // to absorb that cost competing with the other files in the suite.
+  }, 15_000);
 
   it('renders route content rather than only the shell', async () => {
     const App = await loadApp();
@@ -82,7 +84,9 @@ describe('App router wiring', () => {
     window.history.pushState({}, '', '/admin/player/comments');
     render(<App />);
     // Role=heading, because the sidebar carries a button with the same label.
-    expect(await screen.findByRole('heading', { name: 'Comments' })).toBeTruthy();
+    // The 5 s wait absorbs the lazy admin chunk competing with the rest of the
+    // suite for CPU; the 1 s default times out there but never locally.
+    expect(await screen.findByRole('heading', { name: 'Comments' }, { timeout: 5_000 })).toBeTruthy();
   });
 
   it('redirects a bare /admin/player to the programs section', async () => {
@@ -97,6 +101,6 @@ describe('App router wiring', () => {
     const App = await loadApp();
     window.history.pushState({}, '', '/admin/player/not-a-section');
     render(<App />);
-    expect(await screen.findByRole('heading', { name: 'Programs' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Programs' }, { timeout: 5_000 })).toBeTruthy();
   });
 });

@@ -3,7 +3,7 @@ import { getFingerprint } from './fingerprint';
 import type {
   AuthUser, Comment, MeUpdateInput, CreateUserInput, Program,
   SearchResults, Track, TrackUpdateInput, UserRow,
-  Leader, Album, Announcement, SiteEvent,
+  Leader, Album, Announcement, SiteEvent, BlogPost, WhatsNewItem,
 } from './types';
 
 export const uploadUrl = baseUploadUrl;
@@ -399,7 +399,7 @@ export const api = {
 
   uploadTrackResumable,
 
-  // ---- Site content: leadership, albums, announcements, events ----
+  // ---- Site content: leadership, albums, announcements, events, blog ----
 
   // Public reads (anonymous, cached on the server).
   getLeaders: () => request<Leader[]>('/site/leaders'),
@@ -445,6 +445,25 @@ export const api = {
     request<{ message: string }>(`/site/events/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteSiteEvent: (id: string) =>
     request<{ message: string }>(`/site/events/${id}`, { method: 'DELETE' }),
+
+  // ---- Blog ----
+
+  // Public reads: published posts only, cached on the server.
+  getBlogPosts: () => request<BlogPost[]>('/site/blog'),
+  getBlogPost: (slug: string) => request<BlogPost>(`/site/blog/${encodeURIComponent(slug)}`),
+  // Admin listing with drafts. The route sits before /blog/:slug server-side,
+  // so "admin" is never mistaken for a slug.
+  getAdminBlogPosts: () => request<BlogPost[]>('/site/blog/admin'),
+  // Multipart: the cover image rides along with the fields.
+  createBlogPost: (data: FormData, onProgress?: (percent: number) => void) =>
+    formRequest<BlogPost>('/site/blog', data, 'POST', onProgress),
+  updateBlogPost: (id: string, data: FormData, onProgress?: (percent: number) => void) =>
+    formRequest<{ message: string }>(`/site/blog/${id}`, data, 'PUT', onProgress),
+  deleteBlogPost: (id: string) =>
+    request<{ message: string }>(`/site/blog/${id}`, { method: 'DELETE' }),
+
+  /** Merged blogs + announcements + events, newest first, for the bell. */
+  getWhatsNew: () => request<WhatsNewItem[]>('/site/whats-new'),
 
   getAnalytics: () => request<Analytics>('/analytics/'),
 

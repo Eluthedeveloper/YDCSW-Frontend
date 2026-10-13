@@ -114,6 +114,7 @@ export function Footer(): React.ReactElement {
             <li><Link to="/divisions" className="transition hover:text-gold">{t("nav.divisions")}</Link></li>
             <li><Link to="/bookshops" className="transition hover:text-gold">{t("nav.bookshops")}</Link></li>
             <li><Link to="/gallery" className="transition hover:text-gold">{t("nav.gallery")}</Link></li>
+            <li><Link to="/blog" className="transition hover:text-gold">{t("nav.blog")}</Link></li>
             <li><Link to="/contact" className="transition hover:text-gold">{t("nav.contact")}</Link></li>
           </ul>
         </div>

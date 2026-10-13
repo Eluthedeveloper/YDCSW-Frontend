@@ -76,6 +76,7 @@ export const programsEn = {
   publicNav: {
     home: "Home",
     programs: "Program Library",
+    blog: "News & Blog",
     latestTracks: "Latest Tracks",
     search: "Search",
     backHome: "Back to Home",
@@ -194,6 +195,7 @@ export const programsAm: typeof programsEn = {
   publicNav: {
     home: "መነሻ",
     programs: "የፕሮግራም ቤተ መዛግብት",
+    blog: "ዜናና ብሎግ",
     latestTracks: "የቅርብ ጊዜ ትራኮች",
     search: "ፈልግ",
     backHome: "ወደ መነሻ ተመለስ",
@@ -316,6 +318,7 @@ export const programsOm: typeof programsEn = {
   publicNav: {
     home: "Fuula Jalqabaa",
     programs: "Kuusaa Piroogiraamii",
+    blog: "Oduu fi Blogii",
     latestTracks: "Traakiiwwan Dhiyoo",
     search: "Barbaadi",
     backHome: "Fuula Jalqabaa Deebi'i",
