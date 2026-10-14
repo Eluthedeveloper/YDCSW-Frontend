@@ -13,11 +13,15 @@ import type { WhatsNewItem } from "../player/utils/types";
  * the visitor acknowledged the feed is kept in localStorage, and anything
  * published after it counts as unseen. That keeps the server stateless (no
  * accounts, no per-visitor rows) while still meaning "new since you last
- * looked" rather than "new since the page loaded".
+ * looked" rather than "new since the page loaded". A browser with no stored
+ * timestamp gets a FIRST_VISIT_GRACE_MS window instead of a "now" baseline,
+ * so first-time visitors still see recent posts blink.
  */
 const SEEN_KEY = "yd_whats_new_seen";
 const POLL_MS = 60_000;
 const MAX_SHOWN = 8;
+/** How much history counts as unseen for a browser that never picked the feed. */
+const FIRST_VISIT_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** MySQL `YYYY-MM-DD HH:MM:SS` is parsed as local time, matching the pages. */
 function parseTime(value: string | undefined): number {
@@ -67,10 +71,14 @@ export default function NotificationBell({ variant = 'navy', className = '' }: P
   const [open, setOpen] = useState(false);
   const [seenAt, setSeenAt] = useState<number>(() => {
     const stored = Number(localStorage.getItem(SEEN_KEY));
-    // First visit: start from "now" so a brand-new visitor is not greeted by
-    // a bell blinking over content that predates their arrival. The stored
-    // value is written immediately so a reload keeps the same baseline.
-    const baseline = Number.isFinite(stored) && stored > 0 ? stored : Date.now();
+    // First visit: backdate the baseline by a grace window instead of starting
+    // at "now". Starting at "now" marked every existing post as read on a new
+    // device's first load, so the bell never blinked there even though the
+    // feed was full — "new" has to mean recent, not just "published after
+    // this browser happened to open". The stored value is written immediately
+    // so a reload keeps the same baseline.
+    const baseline =
+      Number.isFinite(stored) && stored > 0 ? stored : Date.now() - FIRST_VISIT_GRACE_MS;
     localStorage.setItem(SEEN_KEY, String(baseline));
     return baseline;
   });

@@ -55,6 +55,26 @@ describe('NotificationBell', () => {
     expect(await screen.findByRole('button', { name: "What's New" })).toBeInTheDocument();
   });
 
+  it('blinks on a first visit for content inside the grace window', async () => {
+    // No stored timestamp: this browser has never picked the feed, so a
+    // two-day-old post must still count as unseen.
+    getWhatsNew.mockResolvedValue(feed(2 * 24 * 60));
+
+    renderBell();
+
+    const trigger = await screen.findByRole('button', { name: /new update/ });
+    expect(trigger).toBeInTheDocument();
+    expect(screen.getByText('1')).toBeInTheDocument();
+  });
+
+  it('stays quiet on a first visit for content older than the grace window', async () => {
+    getWhatsNew.mockResolvedValue(feed(8 * 24 * 60));
+
+    renderBell();
+
+    expect(await screen.findByRole('button', { name: "What's New" })).toBeInTheDocument();
+  });
+
   it('blinks with a count for an update posted after the last visit', async () => {
     localStorage.setItem(SEEN_KEY, String(Date.now() - 60 * 60_000));
     getWhatsNew.mockResolvedValue(feed(5));

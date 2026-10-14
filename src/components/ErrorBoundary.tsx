@@ -9,11 +9,6 @@ interface State {
   error: Error | null;
 }
 
-/**
- * Catches render-time crashes anywhere below it so a single bad component
- * shows a message instead of a blank page. There is no real need to
- * distinguish cases here; the details are logged for diagnosis.
- */
 export default class ErrorBoundary extends Component<Props, State> {
   state: State = { error: null };
 
