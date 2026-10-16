@@ -384,6 +384,11 @@ export const api = {
   createTrack: (data: FormData, onProgress?: (percent: number) => void) =>
     formRequest<Track>('/tracks', data, 'POST', onProgress),
   deleteTrack: (id: string) => request<{ message: string }>(`/tracks/${id}`, { method: 'DELETE' }),
+  deleteTracks: (trackIds: string[]) =>
+    request<{ message: string; deleted: number; notFound: string[] }>('/tracks', {
+      method: 'DELETE',
+      body: JSON.stringify({ trackIds }),
+    }),
   updateTrack: (id: string, data: TrackUpdateInput) =>
     request<{ message: string }>(`/tracks/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   reorderTracks: (programId: string, trackIds: string[]) =>

@@ -75,6 +75,18 @@ describe('api client', () => {
     expect(options.credentials).toBe('include');
   });
 
+  it('sends the selected track ids as JSON on a bulk delete', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ message: 'Tracks deleted', deleted: 2, notFound: [] }));
+
+    await api.deleteTracks(['t1', 't2']);
+
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toContain('/tracks');
+    expect(options.method).toBe('DELETE');
+    expect(options.headers['Content-Type']).toBe('application/json');
+    expect(JSON.parse(options.body)).toEqual({ trackIds: ['t1', 't2'] });
+  });
+
   it('surfaces the server error message with its status', async () => {
     fetchMock.mockResolvedValue(jsonResponse({ error: 'Super Admin access required' }, 403));
 

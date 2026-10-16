@@ -5,6 +5,7 @@ import ProgramsPage from './ProgramsPage';
 import { usePlayerAuth } from '../context/AuthContext';
 import { usePlayer } from '../context/PlayerContext';
 import { api } from '../utils/api';
+import { toast } from 'sonner';
 
 const toastMock = vi.hoisted(() => vi.fn());
 vi.mock('sonner', () => ({
@@ -16,7 +17,7 @@ vi.mock('sonner', () => ({
 vi.mock('../context/AuthContext', () => ({ usePlayerAuth: vi.fn() }));
 vi.mock('../context/PlayerContext', () => ({ usePlayer: vi.fn() }));
 vi.mock('../utils/api', () => ({
-  api: { getPrograms: vi.fn(), getTracks: vi.fn(), updateProgram: vi.fn() },
+  api: { getPrograms: vi.fn(), getTracks: vi.fn(), updateProgram: vi.fn(), deleteTracks: vi.fn() },
   // CoverBg builds its src through this; the module mock replaces the whole
   // file, so it has to be provided or the component throws.
   uploadUrl: (p: string) => `/api/uploads/${p}`,
@@ -134,5 +135,51 @@ describe('ProgramsPage edit controls', () => {
     // The old markup used opacity-0 + group-hover, so the button existed in the
     // DOM but was invisible until hover.
     for (const btn of edits) expect(btn.className).not.toContain('opacity-0');
+  });
+
+  async function openTracks() {
+    render(<ProgramsPage />);
+    await screen.findByText('Long Cover Program');
+    await userEvent.click(screen.getByText('Long Cover Program'));
+    await screen.findByText('Track One');
+  }
+
+  it('deletes only the tracks that were selected, after confirmation', async () => {
+    vi.mocked(api.deleteTracks).mockResolvedValue({ message: 'Tracks deleted', deleted: 1, notFound: [] } as never);
+
+    await openTracks();
+    await userEvent.click(screen.getByLabelText('Select track Track One'));
+    await userEvent.click(screen.getByRole('button', { name: /^delete \(/i }));
+
+    const { action } = vi.mocked(toast.warning).mock.calls[0][1] as unknown as { action: { onClick: () => Promise<void> } };
+    await action.onClick();
+
+    expect(api.deleteTracks).toHaveBeenCalledWith(['t1']);
+    await waitFor(() => expect(toast.success).toHaveBeenCalled());
+    expect(screen.getByLabelText('Select track Track One')).not.toBeChecked();
+  });
+
+  it('selects every track from the header checkbox and clears it again', async () => {
+    await openTracks();
+
+    await userEvent.click(screen.getByLabelText('Select all tracks'));
+    expect(screen.getByRole('button', { name: 'Delete (2)' })).toBeTruthy();
+
+    await userEvent.click(screen.getByLabelText('Select all tracks'));
+    expect(screen.queryByRole('button', { name: /^delete \(/i })).toBeNull();
+  });
+
+  it('offers no bulk delete to a non-super admin', async () => {
+    vi.mocked(usePlayerAuth).mockReturnValue({
+      user: { id: '1', username: 'admin', email: 'a@a.com', role: 'admin' },
+      isChecking: false, isSuperAdmin: false,
+      login: vi.fn(), logout: vi.fn(),
+    } as never);
+
+    await openTracks();
+
+    expect(screen.queryByLabelText('Select all tracks')).toBeNull();
+    expect(screen.queryByLabelText('Select track Track One')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^delete \(/i })).toBeNull();
   });
 });

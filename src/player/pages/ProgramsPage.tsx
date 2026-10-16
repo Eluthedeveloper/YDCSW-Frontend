@@ -1,5 +1,5 @@
 import { errorMessage } from '../utils/errors';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { usePlayerAuth } from '../context/AuthContext';
 import { usePlayer } from '../context/PlayerContext';
 import { api } from '../utils/api';
@@ -7,7 +7,7 @@ import { compressImage } from '../../lib/compressImage';
 import CoverBg from '../components/CoverBg';
 import BulkUploadModal from '../components/BulkUploadModal';
 import { toast } from 'sonner';
-import { readAudioMetadata } from '../utils/metadata';
+import { readAudioMetadata, type AudioMetadata } from '../utils/metadata';
 import { FolderOpen, Plus, Trash2, Play, Pause, Upload, X, Loader2, ChevronUp, ChevronDown, ListMusic, FileAudio, Pencil, Check } from 'lucide-react';
 import type { Program, Track } from '../utils/types';
 
@@ -23,6 +23,7 @@ export default function ProgramsPage() {
   const [programs, setPrograms] = useState<Program[]>([]);
   const [selectedProgram, setSelectedProgram] = useState<string | null>(null);
   const [tracks, setTracks] = useState<Track[]>([]);
+  const [selectedTrackIds, setSelectedTrackIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [showUploadTrack, setShowUploadTrack] = useState(false);
@@ -33,6 +34,8 @@ export default function ProgramsPage() {
   const [trackForm, setTrackForm] = useState({ title: '', artist: '', album: '', track_type: 'episode' });
   const [trackFile, setTrackFile] = useState<File | null>(null);
   const [detectingMeta, setDetectingMeta] = useState(false);
+  const [metaFound, setMetaFound] = useState(false);
+  const lastAutoFill = useRef<AudioMetadata | null>(null);
   const [trackProgress, setTrackProgress] = useState<number | null>(null);
   const [coverProgress, setCoverProgress] = useState<number | null>(null);
   const [editingTrackId, setEditingTrackId] = useState<string | null>(null);
@@ -71,10 +74,12 @@ export default function ProgramsPage() {
   };
 
   const loadTracks = async (programId: string) => {
+    if (programId !== selectedProgram) setSelectedTrackIds([]);
     setSelectedProgram(programId);
     try {
       const data = await api.getTracks(programId);
       setTracks(data);
+      setSelectedTrackIds((prev) => prev.filter((id) => data.some((track) => track.id === id)));
     } catch (err: unknown) {
       toast.error(errorMessage(err, 'Failed to load tracks'));
     }
@@ -167,12 +172,17 @@ export default function ProgramsPage() {
     setDetectingMeta(true);
     try {
       const meta = await readAudioMetadata(file);
+      const auto = lastAutoFill.current;
+      const keepIfEdited = (current: string, previous: string) => (auto && current && current !== previous ? current : '');
       setTrackForm(prev => ({
         ...prev,
-        title: prev.title || meta.title,
-        artist: prev.artist || meta.artist,
-        album: prev.album || meta.album,
+        title: keepIfEdited(prev.title, auto?.title ?? '') || meta.title,
+        artist: keepIfEdited(prev.artist, auto?.artist ?? '') || meta.artist,
+        album: keepIfEdited(prev.album, auto?.album ?? '') || meta.album,
       }));
+      lastAutoFill.current = meta;
+      const stem = file.name.replace(/\.[^.]+$/, '');
+      setMetaFound(meta.title !== stem || !!meta.artist || !!meta.album);
     } finally { setDetectingMeta(false); }
   };
 
@@ -220,6 +230,41 @@ export default function ProgramsPage() {
             toast.success('Track deleted');
           } catch (err: unknown) {
             toast.error(errorMessage(err, 'Failed to delete track'));
+          }
+        },
+      },
+      cancel: {
+        label: 'Cancel',
+        onClick: () => {},
+      },
+    });
+  };
+
+  const allTracksSelected = tracks.length > 0 && selectedTrackIds.length === tracks.length;
+
+  const toggleTrackSelection = (id: string) => {
+    setSelectedTrackIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const toggleSelectAllTracks = () => {
+    setSelectedTrackIds(allTracksSelected ? [] : tracks.map((t) => t.id));
+  };
+
+  const deleteSelectedTracks = () => {
+    const ids = selectedTrackIds;
+    if (ids.length === 0) return;
+    toast.warning(`Delete ${ids.length} ${ids.length === 1 ? 'track' : 'tracks'}?`, {
+      action: {
+        label: 'Delete',
+        onClick: async () => {
+          try {
+            const result = await api.deleteTracks(ids);
+            setSelectedTrackIds([]);
+            if (selectedProgram) loadTracks(selectedProgram);
+            loadPrograms();
+            toast.success(`${result.deleted} ${result.deleted === 1 ? 'track' : 'tracks'} deleted`);
+          } catch (err: unknown) {
+            toast.error(errorMessage(err, 'Failed to delete tracks'));
           }
         },
       },
@@ -309,8 +354,23 @@ export default function ProgramsPage() {
       {selectedProgram && (
         <div className="mt-8 glass-panel rounded-xl p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold dark:text-white text-dark-900">Tracks</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-bold dark:text-white text-dark-900">Tracks</h2>
+              {isSuperAdmin && tracks.length > 0 && (
+                <label className="flex items-center gap-1.5 text-xs dark:text-dark-300 text-dark-500 cursor-pointer select-none">
+                  <input type="checkbox" checked={allTracksSelected} onChange={toggleSelectAllTracks}
+                    aria-label="Select all tracks" className="rounded dark:border-white/10 border-dark-300" />
+                  Select all
+                </label>
+              )}
+            </div>
             <div className="flex items-center gap-2">
+              {isSuperAdmin && selectedTrackIds.length > 0 && (
+                <button onClick={deleteSelectedTracks}
+                  className="flex items-center gap-2 px-3 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-lg transition-all">
+                  <Trash2 size={14} /> Delete ({selectedTrackIds.length})
+                </button>
+              )}
               <button onClick={() => { setTrackForm({ title: '', artist: '', album: '', track_type: 'episode' }); setTrackFile(null); setShowUploadTrack(true); }}
                 className="flex items-center gap-2 px-3 py-2 dark:bg-dark-500 bg-light-300 dark:hover:bg-dark-400 hover:bg-light-400 dark:text-white text-dark-900 text-xs font-medium rounded-lg transition-all">
                 <FileAudio size={14} /> Single Upload
@@ -329,6 +389,11 @@ export default function ProgramsPage() {
                 <div key={t.id} className={`flex items-center gap-2 p-2.5 rounded-lg transition-colors ${
                   currentTrack?.id === t.id ? 'bg-primary-600/10' : 'dark:hover:bg-dark-500/50 hover:bg-light-300/50'
                 }`}>
+                  {isSuperAdmin && (
+                    <input type="checkbox" checked={selectedTrackIds.includes(t.id)}
+                      onChange={() => toggleTrackSelection(t.id)} aria-label={`Select track ${t.title}`}
+                      className="rounded dark:border-white/10 border-dark-300 flex-shrink-0 cursor-pointer" />
+                  )}
                   {/* min-w-0 lets the title cell shrink so `truncate` works; without
                       it a long title pushes the row wider than the viewport. */}
                   <div className="flex flex-col gap-0">
@@ -506,7 +571,8 @@ export default function ProgramsPage() {
                  <input type="file" accept="audio/*" onChange={handleTrackFileChange} required
                    className="w-full max-w-full min-w-0 text-sm dark:text-dark-200 text-dark-600 file:mr-4 file:max-w-full file:min-w-0 file:truncate file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-600 file:text-white file:cursor-pointer hover:file:bg-primary-700" />
                 {detectingMeta && <p className="text-xs text-primary-400 mt-1 flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> Detecting metadata...</p>}
-                {trackFile && !detectingMeta && <p className="text-xs text-green-400 mt-1">Metadata detected - edit below if needed</p>}
+                {trackFile && !detectingMeta && metaFound && <p className="text-xs text-green-400 mt-1">Metadata detected - edit below if needed</p>}
+                {trackFile && !detectingMeta && !metaFound && <p className="text-xs dark:text-dark-400 text-dark-500 mt-1">No tags in this file - the file name was used as the title</p>}
               </div>
               <div className="mb-3">
                 <label className="block text-xs font-medium dark:text-dark-100 text-dark-700 mb-1.5">Title</label>
