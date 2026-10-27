@@ -130,6 +130,16 @@ export interface SiteEvent {
   created_at?: string;
 }
 
+/** One hour slot of the weekly radio grid; unique per (day, hour). */
+export interface RadioSlot {
+  id: string;
+  day: 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun';
+  hour: number;
+  title: string;
+  host?: string | null;
+  category: 'worship' | 'teaching' | 'talk' | 'music' | 'live';
+}
+
 export interface BlogPost {
   id: string;
   slug: string;

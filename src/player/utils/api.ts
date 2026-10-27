@@ -3,7 +3,7 @@ import { getFingerprint } from './fingerprint';
 import type {
   AuthUser, Comment, MeUpdateInput, CreateUserInput, Program,
   SearchResults, Track, TrackUpdateInput, UserRow,
-  Leader, Album, Announcement, SiteEvent, BlogPost, WhatsNewItem,
+  Leader, Album, Announcement, SiteEvent, BlogPost, WhatsNewItem, RadioSlot,
 } from './types';
 
 export const uploadUrl = baseUploadUrl;
@@ -412,6 +412,13 @@ export const api = {
     request<Album[]>(`/site/albums${department ? `?department=${encodeURIComponent(department)}` : ''}`),
   getAnnouncements: () => request<Announcement[]>('/site/announcements'),
   getSiteEvents: () => request<SiteEvent[]>('/site/events'),
+
+  // Weekly radio grid. `saveRadioSlot` upserts on (day, hour).
+  getRadioSchedule: () => request<RadioSlot[]>('/site/schedule'),
+  saveRadioSlot: (data: Pick<RadioSlot, 'day' | 'hour' | 'title' | 'category'> & { host?: string | null }) =>
+    request<{ message: string }>('/site/schedule', { method: 'PUT', body: JSON.stringify(data) }),
+  deleteRadioSlot: (id: string) =>
+    request<{ message: string }>(`/site/schedule/${id}`, { method: 'DELETE' }),
 
   // Leaders. Create/update are multipart because a photo rides along; the
   // backend reads `req.body` the same way either way.

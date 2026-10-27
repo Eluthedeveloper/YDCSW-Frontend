@@ -6,22 +6,23 @@ import { compressImage, compressImages } from '../../lib/compressImage';
 import { toast } from 'sonner';
 import {
   Users, Images, Megaphone, CalendarDays, Plus, Trash2, X, Loader2,
-  ChevronUp, ChevronDown, Pencil, Check, Upload, Pin,
+  ChevronUp, ChevronDown, Pencil, Check, Upload, Pin, Radio,
 } from 'lucide-react';
-import type { Leader, Album, AlbumPhoto, Announcement, SiteEvent } from '../utils/types';
+import type { Leader, Album, AlbumPhoto, Announcement, SiteEvent, RadioSlot } from '../utils/types';
 
 // Mirrors the backend's image cap (site.ts MAX_PHOTO_BYTES) so an oversized
 // photo is rejected before the upload starts instead of dying in multer.
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 const MAX_IMAGE_MB = MAX_IMAGE_BYTES / (1024 * 1024);
 
-type Tab = 'leaders' | 'albums' | 'announcements' | 'events';
+type Tab = 'leaders' | 'albums' | 'announcements' | 'events' | 'radio';
 
 const TABS: Array<{ id: Tab; label: string; icon: typeof Users }> = [
   { id: 'leaders', label: 'Leadership', icon: Users },
   { id: 'albums', label: 'Photo Albums', icon: Images },
   { id: 'announcements', label: 'Announcements', icon: Megaphone },
   { id: 'events', label: 'Events', icon: CalendarDays },
+  { id: 'radio', label: 'Radio Schedule', icon: Radio },
 ];
 
 /** MySQL DATETIME → the value a `datetime-local` input expects. */
@@ -674,6 +675,9 @@ export default function SiteContentPage() {
             </Modal>
           )}
         </section>
+      ) : tab === 'radio' ? (
+        /* ---------------- Radio Schedule ---------------- */
+        <RadioScheduleTab isSuperAdmin={isSuperAdmin} />
       ) : (
         /* ---------------- Events ---------------- */
         <section>
@@ -762,5 +766,165 @@ export default function SiteContentPage() {
         </section>
       )}
     </div>
+  );
+}
+
+/**
+ * Weekly radio grid editor. Mirrors the public RadioSchedule layout: a day
+ * selector plus 24 hour rows; a slot is addressed by (day, hour) — the exact
+ * key the backend upserts on — so editing an existing hour and adding a new
+ * one are the same PUT.
+ */
+function RadioScheduleTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
+  const RADIO_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
+  type RadioDay = (typeof RADIO_DAYS)[number];
+  const RADIO_CATEGORIES = ['worship', 'teaching', 'talk', 'music', 'live'] as const;
+
+  const [slots, setSlots] = useState<RadioSlot[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [savingHour, setSavingHour] = useState<string | null>(null);
+  const [activeDay, setActiveDay] = useState<RadioDay>(RADIO_DAYS[(new Date().getDay() + 6) % 7] as RadioDay);
+
+  // Editing state per row, keyed by hour. A row with a slot starts in edit
+  // mode only when the pencil is clicked; empty rows offer a one-click add
+  // with a prefilled title field.
+  const [drafts, setDrafts] = useState<Record<number, { title: string; host: string; category: string }>>({});
+  const [editing, setEditing] = useState<number | null>(null);
+
+  const loadSlots = async () => {
+    const rows = await api.getRadioSchedule();
+    setSlots(rows);
+  };
+
+  useEffect(() => {
+    let mounted = true;
+    api.getRadioSchedule().then(
+      (rows) => { if (mounted) setSlots(rows); },
+      (err: unknown) => { if (mounted) toast.error(errorMessage(err, 'Failed to load radio schedule')); }
+    ).finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
+  }, []);
+
+  const byHour = Object.fromEntries(slots.filter((s) => s.day === activeDay).map((s) => [s.hour, s]));
+
+  const saveSlot = async (hour: number) => {
+    const draft = drafts[hour];
+    if (!draft?.title.trim()) { toast.error('A title is required'); return; }
+    if (draft.title.length > 255) { toast.error('Title is limited to 255 characters'); return; }
+    setSavingHour(`${activeDay}:${hour}`);
+    try {
+      await api.saveRadioSlot({
+        day: activeDay, hour, title: draft.title.trim(),
+        host: draft.host.trim() || null,
+        category: (RADIO_CATEGORIES as readonly string[]).includes(draft.category)
+          ? draft.category as RadioSlot['category'] : 'talk',
+      });
+      await loadSlots();
+      setEditing(null);
+      setDrafts((prev) => { const { [hour]: _drop, ...rest } = prev; return rest; });
+      setSavingHour(null);
+    } catch (err: unknown) {
+      setSavingHour(null);
+      toast.error(errorMessage(err, 'Failed to save slot'));
+    }
+  };
+
+  const deleteSlot = async (slot: RadioSlot) => {
+    try {
+      await api.deleteRadioSlot(slot.id);
+      await loadSlots();
+      toast.success(`${slot.title} cleared`);
+    } catch (err: unknown) {
+      toast.error(errorMessage(err, 'Failed to clear slot'));
+    }
+  };
+
+  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 size={32} className="animate-spin text-primary-400" /></div>;
+
+  return (
+    <section>
+      <p className="text-sm dark:text-dark-300 text-dark-500 mb-4">
+        The weekly schedule shown on the homepage. One program per hour slot; saving edits the slot at that day and hour.
+      </p>
+
+      <div className="flex flex-wrap gap-2 mb-6">
+        {RADIO_DAYS.map((day) => (
+          <button key={day} onClick={() => { setActiveDay(day); setEditing(null); }}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              activeDay === day
+                ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20'
+                : 'dark:bg-dark-500 bg-light-300 dark:text-dark-200 text-dark-600 dark:hover:bg-dark-400 hover:bg-light-400'
+            }`}>
+            {day}
+          </button>
+        ))}
+      </div>
+
+      <div className="glass-panel rounded-xl divide-y divide-border">
+        {Array.from({ length: 24 }, (_, hour) => {
+          const slot = byHour[hour] as RadioSlot | undefined;
+          const draft = drafts[hour] ?? { title: slot?.title ?? '', host: slot?.host ?? '', category: slot?.category ?? 'talk' };
+          const isEditing = editing === hour;
+          const isSaving = savingHour === `${activeDay}:${hour}`;
+          return (
+            <div key={hour} className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3">
+              <span className="text-sm font-semibold tabular-nums dark:text-dark-100 text-dark-700 sm:w-14 shrink-0">
+                {String(hour).padStart(2, '0')}:00
+              </span>
+              {isEditing ? (
+                <div className="flex-1 flex flex-col sm:flex-row gap-2">
+                  <input type="text" value={draft.title} placeholder="Program title"
+                    onChange={(e) => setDrafts({ ...drafts, [hour]: { ...draft, title: e.target.value } })}
+                    className={inputClass} aria-label={`Program title for ${activeDay} ${hour}:00`} />
+                  <input type="text" value={draft.host} placeholder="Host (optional)"
+                    onChange={(e) => setDrafts({ ...drafts, [hour]: { ...draft, host: e.target.value } })}
+                    className={`${inputClass} sm:w-48`} aria-label={`Host for ${activeDay} ${hour}:00`} />
+                  <select value={draft.category}
+                    onChange={(e) => setDrafts({ ...drafts, [hour]: { ...draft, category: e.target.value } })}
+                    className={`${inputClass} sm:w-36`} aria-label={`Category for ${activeDay} ${hour}:00`}>
+                    {RADIO_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <div className="flex gap-1 shrink-0">
+                    <button onClick={() => saveSlot(hour)} disabled={isSaving} title="Save slot"
+                      className="flex items-center gap-1 px-3 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-xs font-medium rounded-lg transition-all">
+                      {isSaving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Save
+                    </button>
+                    <button onClick={() => { setEditing(null); }} title="Cancel"
+                      className="p-2 dark:bg-dark-500 bg-light-300 dark:text-dark-200 text-dark-600 rounded-lg"><X size={14} /></button>
+                  </div>
+                </div>
+              ) : slot ? (
+                <div className="flex-1 flex items-center justify-between gap-3 min-w-0">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium dark:text-white text-dark-900 truncate">{slot.title}</p>
+                    {slot.host && <p className="text-xs dark:text-dark-300 text-dark-500">{slot.host}</p>}
+                  </div>
+                  <div className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+                    slot.category === 'worship' ? 'bg-gold/15 text-gold' : slot.category === 'live' ? 'bg-red-500/10 text-red-500' : 'dark:bg-dark-500 bg-muted dark:text-dark-200 text-muted-foreground'
+                  }`}>{slot.category}</div>
+                  <div className="flex gap-1 shrink-0">
+                    <button title={`Edit ${slot.title}`} onClick={() => { setDrafts({ ...drafts, [hour]: { title: slot.title, host: slot.host ?? '', category: slot.category } }); setEditing(hour); }}
+                      className="p-1 dark:text-dark-300 text-dark-500 hover:text-primary-400"><Pencil size={13} /></button>
+                    {isSuperAdmin && (
+                      <button title="Clear slot" onClick={() => deleteSlot(slot)}
+                        className="p-1 dark:text-dark-300 text-dark-500 hover:text-red-400"><Trash2 size={13} /></button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 flex items-center justify-between gap-3">
+                  <span className="text-sm dark:text-dark-400 text-dark-500 italic">Off air</span>
+                  <button title={`Add program at ${hour}:00`}
+                    onClick={() => { setDrafts({ ...drafts, [hour]: { title: '', host: '', category: 'talk' } }); setEditing(hour); }}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium dark:text-dark-200 text-dark-600 dark:hover:bg-dark-400 hover:bg-light-400 rounded-lg transition-all">
+                    <Plus size={12} /> Add
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }

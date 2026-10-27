@@ -1,5 +1,8 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useAsyncData } from "../player/hooks/useAsyncData";
+import { api } from "../player/utils/api";
+import type { RadioSlot } from "../player/utils/types";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 type Day = (typeof DAYS)[number];
@@ -10,6 +13,12 @@ type Program = {
   category: "Worship" | "Teaching" | "Talk" | "Music" | "Live";
 };
 
+/**
+ * Fallback lines only, copied from the rows migration 016 seeds into
+ * `radio_schedule`. It exists so the section still renders the familiar grid
+ * while the schedule API is unreachable (e.g. backend restart); served data
+ * always wins once it loads.
+ */
 const SCHEDULE: Record<Day, Record<number, Program>> = {
   Mon: {
     0:  { title: "Midnight Prayer & Worship", host: "Prayer Team", category: "Worship" },
@@ -103,16 +112,51 @@ function categoryBadge(category: string): string {
     Music: "bg-primary/10 text-primary",
     Live: "bg-red-500/15 text-red-500",
   };
-  return map[category] ?? "bg-muted text-muted-foreground";
+  return map[category.toLowerCase()] ?? map[category] ?? "bg-muted text-muted-foreground";
+}
+
+const DB_CATEGORY_TO_LABEL: Record<string, Program["category"]> = {
+  worship: "Worship",
+  teaching: "Teaching",
+  talk: "Talk",
+  music: "Music",
+  live: "Live",
+};
+
+/** DB rows → the (day → hour → program) shape the renderer consumes. */
+function toScheduleMap(rows: RadioSlot[]): Record<Day, Record<number, Program>> {
+  const result: Record<Day, Record<number, Program>> = {} as Record<Day, Record<number, Program>>;
+  for (const row of rows) {
+    if (!result[row.day]) result[row.day] = {};
+    result[row.day][row.hour] = {
+      title: row.title,
+      host: row.host ?? "",
+      category: DB_CATEGORY_TO_LABEL[row.category] ?? "Talk",
+    };
+  }
+  return result;
 }
 
 export function RadioSchedule(): React.ReactElement {
   const { t } = useTranslation();
+  const [activeDay, setActiveDay] = useState<Day>(getToday());
+
+  // DB is the source of truth; the static grid above is just the offline
+  // fallback, so a backend hiccup briefly degrades instead of blanking.
+  const { data: slots, loading, error, reload } = useAsyncData<RadioSlot[]>(
+    () => api.getRadioSchedule().catch(() => []),
+    []
+  );
+  const liveSchedule = toScheduleMap(slots);
+  const mergeSchedule = (day: Day) => {
+    const live = liveSchedule[day];
+    if (live && Object.keys(live).length > 0) return live;
+    return SCHEDULE[day] ?? {};
+  };
   const today = getToday();
-  const [activeDay, setActiveDay] = useState<Day>(today);
 
   const fullSchedule = Array.from({ length: 24 }, (_, hour) => {
-    const program = SCHEDULE[activeDay]?.[hour];
+    const program = mergeSchedule(activeDay)?.[hour];
     return {
       hour,
       time: `${String(hour).padStart(2, "0")}:00`,
