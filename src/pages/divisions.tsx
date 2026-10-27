@@ -4,6 +4,17 @@ import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
 import { SiteShell } from "../components/site/SiteShell";
 
+/**
+ * `t(key, { returnObjects: true })` returns `undefined` when the key is missing
+ * or holds a plain string instead of an array (e.g. a partially translated or
+ * stale locale). Casting that blind and calling `.map` crashes the whole route
+ * — "Cannot read properties of undefined (reading 'map')" behind the error
+ * boundary — so every array-valued translation goes through this.
+ */
+function toArray(value: unknown): string[] {
+  return Array.isArray(value) ? value : [];
+}
+
 export function DivisionsPage(): React.ReactElement {
   const { t } = useTranslation();
 
@@ -17,7 +28,7 @@ export function DivisionsPage(): React.ReactElement {
         </svg>
       ),
       description: t("divisions.cards.electronic.desc"),
-      duties: t("divisions.cards.electronic.duties", { returnObjects: true }) as string[],
+      duties: toArray(t("divisions.cards.electronic.duties", { returnObjects: true })),
     },
     {
       to: "/divisions/print-media" as const,
@@ -28,7 +39,7 @@ export function DivisionsPage(): React.ReactElement {
         </svg>
       ),
       description: t("divisions.cards.print.desc"),
-      duties: t("divisions.cards.print.duties", { returnObjects: true }) as string[],
+      duties: toArray(t("divisions.cards.print.duties", { returnObjects: true })),
     },
     {
       // The vestment/bookstore division has no page of its own; /bookshops is the
@@ -43,7 +54,7 @@ to: "/bookshops" as const,
         </svg>
       ),
       description: t("divisions.cards.vestment.desc"),
-      duties: t("divisions.cards.vestment.duties", { returnObjects: true }) as string[],
+      duties: toArray(t("divisions.cards.vestment.duties", { returnObjects: true })),
       locations: [
         { name: t("divisions.cards.vestment.locations.0.name"), address: t("divisions.cards.vestment.locations.0.address") },
         { name: t("divisions.cards.vestment.locations.1.name"), address: t("divisions.cards.vestment.locations.1.address") },
@@ -61,7 +72,7 @@ to: "/bookshops" as const,
         </svg>
       ),
       description: t("divisions.cards.finance.desc"),
-      duties: t("divisions.cards.finance.duties", { returnObjects: true }) as string[],
+      duties: toArray(t("divisions.cards.finance.duties", { returnObjects: true })),
     },
   ];
 
@@ -111,7 +122,7 @@ to: "/bookshops" as const,
                   {t("divisions.directorDesc")}
                 </p>
                 <ul className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {(t("divisions.directorDuties", { returnObjects: true }) as string[]).map((duty) => (
+                  {toArray(t("divisions.directorDuties", { returnObjects: true })).map((duty) => (
                     <li key={duty} className="flex items-center gap-2 text-sm text-muted-foreground">
                       <span className="h-1.5 w-1.5 rounded-full bg-gold" />
                       {duty}

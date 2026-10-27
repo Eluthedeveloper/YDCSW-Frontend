@@ -34,6 +34,14 @@ On logout the context clears in-memory state and the server clears the cookie.
 
 The backend still accepts `Authorization: Bearer` for non-browser clients.
 
+## Visitor chatbot
+
+`src/components/ChatBot.tsx` is a floating assistant mounted once in `App.tsx`.
+It calls `POST /api/chat`, which holds the Gemini key server-side; nothing
+secret is present in the bundle. The widget is lazy-loaded, hides on `/admin`
+routes, stays above the collapsed player bar, and is translated into English,
+Amharic and Afaan Oromo through the `chat.*` keys in `src/i18n/locales`.
+
 ## Configuration
 
 `VITE_API_URL` sets the API base path.

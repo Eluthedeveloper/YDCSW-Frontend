@@ -102,10 +102,15 @@ export interface Album {
   id: string;
   title: string;
   description?: string | null;
+  /** Gallery-only when null; otherwise the department page the album mounts on. */
+  department?: string | null;
   created_by?: string;
   created_at?: string;
   photos: AlbumPhoto[];
 }
+
+/** Departments an album can be attached to; keep in step with routes/site.ts. */
+export const ALBUM_DEPARTMENTS = ['electronic', 'print', 'finance', 'resource'] as const;
 
 export interface Announcement {
   id: string;

@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useAsyncData } from '../player/hooks/useAsyncData';
+import { api, uploadUrl } from '../player/utils/api';
+import type { Album } from '../player/utils/types';
 
 export interface GalleryImage {
-  id: number;
+  // Static galleries number their images, dynamic ones reuse the photo row's
+  // uuid; the modal only needs the value for findIndex, not its type.
+  id: string | number;
   src: string;
   caption: string;
   details: string;
@@ -65,5 +70,40 @@ export function useGalleryModal(images: GalleryImage[]) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, close, goToNext, goToPrevious]);
 
-  return { selectedImage, selectedIndex, isOpen, open, close, goToNext, goToPrevious };
+  // Include `images` itself: the division pages destructure it from this hook
+  // to render the grid; omitting it handed them `undefined` and their
+  // `images.map(...)` crashed the route behind the error boundary.
+  return { images, selectedImage, selectedIndex, isOpen, open, close, goToNext, goToPrevious };
+}
+
+/**
+ * Gallery images for a department page: the albums the admin mounted on that
+ * department (see routes/site.ts), rendered as lightbox images, falling back to
+ * the page's built-in static photos while the feed is empty or unreachable.
+ *
+ * The hook is an extension of `useGalleryModal`, so callers destructure the
+ * same members plus `images` — the list actually blurring behind the modal,
+ * which is not always the static fallback.
+ */
+export function useSiteGallery(department: string, fallback: GalleryImage[] = []) {
+  // Same fallback contract as the Gallery page: a failed request resolves to
+  // an empty list, which selects the built-in photos.
+  const { data: albums } = useAsyncData<Album[]>(
+    () => api.getAlbums(department).catch(() => [] as Album[]),
+    []
+  );
+  return useGalleryModal(toGalleryImages(albums, fallback));
+}
+
+function toGalleryImages(albums: Album[], fallback: GalleryImage[]): GalleryImage[] {
+  const albumImages: GalleryImage[] = albums.flatMap((album) =>
+    album.photos.map((photo) => ({
+      id: photo.id,
+      src: uploadUrl(`albums/${photo.file_name}`),
+      caption: photo.caption || album.title,
+      details: album.description || album.title,
+      category: album.title,
+    }))
+  );
+  return albumImages.length > 0 ? albumImages : fallback;
 }

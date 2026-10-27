@@ -1,6 +1,6 @@
 // src/pages/ElectronicMediaDivisionPage.tsx
 import React from "react";
-import { useGalleryModal } from '../hooks/useGalleryModal';
+import { useSiteGallery } from "../hooks/useGalleryModal";
 import { Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
@@ -57,14 +57,23 @@ const galleryImages: GalleryImage[] = [
   },
 ];
 
+/**
+ * `t(key, { returnObjects: true })` returns `undefined` when the key is missing
+ * or holds a plain string (e.g. stale or partial locale), and casting that
+ * blind crashes the render with "Cannot read properties of undefined". */
+function toArray(value: unknown): string[] {
+  return Array.isArray(value) ? value : [];
+}
+
 export function ElectronicMediaDivisionPage(): React.ReactElement {
   const { t } = useTranslation();
-  const { selectedImage, selectedIndex, open, close, goToNext, goToPrevious } =
-    useGalleryModal(galleryImages);
+  // Admin-uploaded albums for this department, falling back to the static photos.
+  const { images, selectedImage, selectedIndex, open, close, goToNext, goToPrevious } =
+    useSiteGallery("electronic", galleryImages);
 
   const currentIndex = selectedIndex ?? 0;
 
-  const duties = t("electronic.duties", { returnObjects: true }) as string[];
+  const duties = toArray(t("electronic.duties", { returnObjects: true }));
 
   return (
     <>
@@ -139,7 +148,7 @@ export function ElectronicMediaDivisionPage(): React.ReactElement {
               </h2>
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {galleryImages.map((image) => (
+              {images.map((image) => (
                 <figure
                   key={image.id}
                   className="group cursor-pointer overflow-hidden rounded-2xl bg-card shadow-[var(--shadow-elegant)] transition hover:shadow-xl"
@@ -225,7 +234,7 @@ export function ElectronicMediaDivisionPage(): React.ReactElement {
                     </p>
                   </div>
                   <span className="text-xs text-background/50">
-                    {currentIndex + 1} {t("electronic.gallery.of")} {galleryImages.length}
+                    {currentIndex + 1} {t("electronic.gallery.of")} {images.length}
                   </span>
                 </div>
                 <p className="mt-2 text-sm text-background/80">

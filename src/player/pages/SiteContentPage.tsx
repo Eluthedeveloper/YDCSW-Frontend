@@ -61,6 +61,17 @@ const secondaryButton =
 const submitButton =
   'w-full py-3 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-medium rounded-lg transition-all flex items-center justify-center gap-2';
 
+/** Album → department page mounts, matching routes/site.ts on the backend. */
+const ALBUM_DEPARTMENT_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: '', label: 'Gallery only (no department)' },
+  { value: 'electronic', label: 'Electronic & Digital Media' },
+  { value: 'print', label: 'Literature & Print Media' },
+  { value: 'finance', label: 'Finance & HR Administration' },
+  { value: 'resource', label: 'Resource Mobilization' },
+];
+const departmentLabel = (value?: string | null) =>
+  ALBUM_DEPARTMENT_OPTIONS.find((option) => option.value === value)?.label ?? value;
+
 export default function SiteContentPage() {
   const { isSuperAdmin } = usePlayerAuth();
   const [tab, setTab] = useState<Tab>('leaders');
@@ -80,7 +91,7 @@ export default function SiteContentPage() {
   const [editingLeader, setEditingLeader] = useState<Leader | null>(null);
   const [showLeaderForm, setShowLeaderForm] = useState(false);
 
-  const [albumForm, setAlbumForm] = useState({ title: '', description: '' });
+  const [albumForm, setAlbumForm] = useState({ title: '', description: '', department: '' });
   const [editingAlbum, setEditingAlbum] = useState<Album | null>(null);
   const [showAlbumForm, setShowAlbumForm] = useState(false);
   const [expandedAlbum, setExpandedAlbum] = useState<string | null>(null);
@@ -215,11 +226,13 @@ export default function SiteContentPage() {
     e.preventDefault();
     setSaving(true);
     try {
+      // An empty select value means "gallery only", stored as null.
+      const payload = { ...albumForm, department: albumForm.department || null };
       if (editingAlbum) {
-        await api.updateAlbum(editingAlbum.id, albumForm);
+        await api.updateAlbum(editingAlbum.id, payload);
         toast.success('Album updated');
       } else {
-        await api.createAlbum(albumForm);
+        await api.createAlbum(payload);
         toast.success('Album created');
       }
       closeAlbumForm();
@@ -489,8 +502,8 @@ export default function SiteContentPage() {
         /* ---------------- Photo Albums ---------------- */
         <section>
           <div className="flex items-center justify-between mb-4">
-            <p className="text-sm dark:text-dark-300 text-dark-500">Albums shown in the Gallery. Open an album to add photos.</p>
-            <button onClick={() => { setAlbumForm({ title: '', description: '' }); setEditingAlbum(null); setShowAlbumForm(true); }} className={primaryButton}>
+            <p className="text-sm dark:text-dark-300 text-dark-500">Albums shown in the Gallery and on department pages. Open an album to add photos.</p>
+            <button onClick={() => { setAlbumForm({ title: '', description: '', department: '' }); setEditingAlbum(null); setShowAlbumForm(true); }} className={primaryButton}>
               <Plus size={16} /> New Album
             </button>
           </div>
@@ -509,6 +522,7 @@ export default function SiteContentPage() {
                       <h3 className="font-semibold dark:text-white text-dark-900 truncate">{album.title}</h3>
                       <p className="text-xs dark:text-dark-300 text-dark-500 mt-0.5">
                         {album.photos.length} photo{album.photos.length === 1 ? '' : 's'}
+                        {album.department ? ` · ${departmentLabel(album.department)}` : ''}
                         {album.description ? ` · ${album.description}` : ''}
                       </p>
                     </button>
@@ -520,7 +534,7 @@ export default function SiteContentPage() {
                         onChange={(e) => addAlbumPhotos(album, e.target.files)} />
                     </label>
                     <button aria-label={`Edit ${album.title}`} title="Edit album"
-                      onClick={() => { setAlbumForm({ title: album.title, description: album.description ?? '' }); setEditingAlbum(album); setShowAlbumForm(true); }}
+                      onClick={() => { setAlbumForm({ title: album.title, description: album.description ?? '', department: album.department ?? '' }); setEditingAlbum(album); setShowAlbumForm(true); }}
                       className="p-1.5 dark:text-dark-300 text-dark-500 hover:text-primary-400"><Pencil size={15} /></button>
                     {isSuperAdmin && (
                       <button aria-label={`Delete ${album.title}`} title="Delete album" onClick={() => deleteAlbum(album)}
@@ -561,10 +575,23 @@ export default function SiteContentPage() {
                   <input id="album-title" type="text" value={albumForm.title} required
                     onChange={(e) => setAlbumForm({ ...albumForm, title: e.target.value })} className={inputClass} />
                 </div>
-                <div className="mb-6">
+                <div className="mb-3">
                   <label className={labelClass} htmlFor="album-desc">Description</label>
                   <textarea id="album-desc" value={albumForm.description}
                     onChange={(e) => setAlbumForm({ ...albumForm, description: e.target.value })} className={`${inputClass} h-20 resize-none`} />
+                </div>
+                <div className="mb-3">
+                  <label className={labelClass} htmlFor="album-department">Department page</label>
+                  <select id="album-department" value={albumForm.department}
+                    onChange={(e) => setAlbumForm({ ...albumForm, department: e.target.value })}
+                    className={inputClass}>
+                    {ALBUM_DEPARTMENT_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs dark:text-dark-400 text-dark-500">
+                    Albums with a department also appear on that department&rsquo;s page.
+                  </p>
                 </div>
                 <button type="submit" disabled={saving} className={submitButton}>
                   {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}

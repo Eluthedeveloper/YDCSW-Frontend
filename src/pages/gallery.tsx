@@ -42,7 +42,11 @@ export function GalleryPage(): React.ReactElement {
     []
   );
 
-  const activeAlbum = dbAlbums.find((album) => album.id === activeAlbumId) ?? null;
+  // Albums a department page mounts are excluded here — they render on their
+  // own page, so the general gallery stays free of department duplicates.
+  const publicAlbums = dbAlbums.filter((album) => !album.department);
+
+  const activeAlbum = publicAlbums.find((album) => album.id === activeAlbumId) ?? null;
   const albumPhotos: Photo[] = activeAlbum
     ? activeAlbum.photos.map((photo) => ({
         src: uploadUrl(`albums/${photo.file_name}`),
@@ -98,7 +102,7 @@ export function GalleryPage(): React.ReactElement {
 
         <section className="bg-background py-20 lg:py-28">
           <div className="mx-auto max-w-7xl px-6 lg:px-12">
-            {dbAlbums.length === 0 ? (
+            {publicAlbums.length === 0 ? (
               /* --------- Built-in fallback photos --------- */
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {PHOTOS.map((p, i) => (
@@ -125,7 +129,7 @@ export function GalleryPage(): React.ReactElement {
             ) : !activeAlbum ? (
               /* --------- Album grid --------- */
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {dbAlbums.map((album) => {
+                {publicAlbums.map((album) => {
                   const cover = album.photos[0];
                   return (
                     <button

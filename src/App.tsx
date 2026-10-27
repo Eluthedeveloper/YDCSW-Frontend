@@ -16,6 +16,9 @@ import HomePage from "./pages/home";
 // admin screens they can never reach.
 const AudioPlayer = lazy(() => import("./player/components/AudioPlayer"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
+// Kept in its own chunk: every visitor may not open the assistant, and the
+// widget is pure extra weight on the pages where it stays closed.
+const ChatBot = lazy(() => import("./components/ChatBot"));
 
 const AboutPage = lazy(() => import("./pages/about").then((m) => ({ default: m.AboutPage })));
 const ContactPage = lazy(() => import("./pages/contact").then((m) => ({ default: m.ContactPage })));
@@ -166,6 +169,12 @@ function PlayerShell() {
               changes rather than remounting on every navigation. */}
           <Suspense fallback={null}>
             <AudioPlayer />
+          </Suspense>
+          {/* Global visitor assistant. It hides itself on /admin, and living
+              here rather than in a page keeps the conversation alive while
+              the visitor moves between the site and the programme library. */}
+          <Suspense fallback={null}>
+            <ChatBot />
           </Suspense>
         </PlayerProvider>
       </PlayerAuthProvider>

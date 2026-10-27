@@ -178,6 +178,69 @@ html.lang-am .font-serif {
   letter-spacing: 0;
 }
 
+/**
+ * Visitor chat widget.
+ *
+ * Positioned as one fixed column that holds both the launcher and the panel, so
+ * the panel always sits directly above the button. The bottom offset tracks the
+ * collapsed player bar: `data-player="open"` is set on <html> while a track is
+ * loaded, and without this the launcher would sit on top of the player.
+ */
+.chat-widget {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.75rem;
+  pointer-events: none;
+}
+
+.chat-widget > * {
+  pointer-events: auto;
+}
+
+html[data-player='open'] .chat-widget {
+  bottom: calc(1rem + var(--player-bar-height));
+}
+
+.chat-panel {
+  width: min(24rem, calc(100vw - 1.5rem));
+  height: min(34rem, calc(100dvh - 8rem));
+}
+
+@media (min-width: 768px) {
+  .chat-widget {
+    right: 1.5rem;
+    bottom: 1.5rem;
+  }
+
+  html[data-player='open'] .chat-widget {
+    bottom: calc(1.5rem + var(--player-bar-height));
+  }
+}
+
+@media (max-width: 639px) {
+  .chat-panel {
+    /* Leave room for the launcher and a little breathing space above it. */
+    height: min(34rem, calc(100dvh - 7.5rem));
+  }
+}
+
+/* The player bar eats into the viewport as well, so the panel has to give up
+   the same height or its header ends up above the top of a phone screen. */
+html[data-player='open'] .chat-panel {
+  height: min(34rem, max(18rem, calc(100dvh - 8rem - var(--player-bar-height))));
+}
+
+@media (max-width: 639px) {
+  html[data-player='open'] .chat-panel {
+    height: min(34rem, max(18rem, calc(100dvh - 7.5rem - var(--player-bar-height))));
+  }
+}
+
 /* Player body dark/light */
 html.dark body { background: #0d0d12; color: #e0e0e0; }
 html.light body { background: #f5f5f7; color: #1a1b1e; }

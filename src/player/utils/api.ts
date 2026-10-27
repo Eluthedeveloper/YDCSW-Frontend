@@ -408,7 +408,8 @@ export const api = {
 
   // Public reads (anonymous, cached on the server).
   getLeaders: () => request<Leader[]>('/site/leaders'),
-  getAlbums: () => request<Album[]>('/site/albums'),
+  getAlbums: (department?: string) =>
+    request<Album[]>(`/site/albums${department ? `?department=${encodeURIComponent(department)}` : ''}`),
   getAnnouncements: () => request<Announcement[]>('/site/announcements'),
   getSiteEvents: () => request<SiteEvent[]>('/site/events'),
 
@@ -426,9 +427,9 @@ export const api = {
       body: JSON.stringify({ ids }),
     }),
 
-  createAlbum: (data: { title: string; description?: string }) =>
+  createAlbum: (data: { title: string; description?: string; department?: string | null }) =>
     request<Album>('/site/albums', { method: 'POST', body: JSON.stringify(data) }),
-  updateAlbum: (id: string, data: { title?: string; description?: string | null }) =>
+  updateAlbum: (id: string, data: { title?: string; description?: string | null; department?: string | null }) =>
     request<{ message: string }>(`/site/albums/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteAlbum: (id: string) =>
     request<{ message: string }>(`/site/albums/${id}`, { method: 'DELETE' }),

@@ -1,6 +1,6 @@
 // src/pages/FinanceDivisionPage.tsx
 import React from "react";
-import { useGalleryModal } from '../hooks/useGalleryModal';
+import { useSiteGallery } from '../hooks/useGalleryModal';
 import { Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
@@ -49,14 +49,23 @@ const galleryImages: GalleryImage[] = [
   },
 ];
 
+/**
+ * `t(key, { returnObjects: true })` returns `undefined` when the key is missing
+ * or holds a plain string (e.g. stale or partial locale), and casting that
+ * blind crashes the render with "Cannot read properties of undefined". */
+function toArray(value: unknown): string[] {
+  return Array.isArray(value) ? value : [];
+}
+
 export function FinanceDivisionPage(): React.ReactElement {
   const { t } = useTranslation();
-  const { selectedImage, selectedIndex, open, close, goToNext, goToPrevious } =
-    useGalleryModal(galleryImages);
+  // Admin-uploaded albums for this department, falling back to the static photos.
+  const { images, selectedImage, selectedIndex, open, close, goToNext, goToPrevious } =
+    useSiteGallery("finance", galleryImages);
 
   const currentIndex = selectedIndex ?? 0;
 
-  const duties = t("finance.duties", { returnObjects: true }) as string[];
+  const duties = toArray(t("finance.duties", { returnObjects: true }));
 
   return (
     <>
@@ -118,7 +127,7 @@ export function FinanceDivisionPage(): React.ReactElement {
               <h2 className="mt-4 font-serif text-4xl text-foreground sm:text-5xl">{t("finance.albumTitle")}</h2>
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {galleryImages.map((image) => (
+              {images.map((image) => (
                 <figure
                   key={image.id}
                   className="group cursor-pointer overflow-hidden rounded-2xl bg-card shadow-[var(--shadow-elegant)] transition hover:shadow-xl"
@@ -193,7 +202,7 @@ export function FinanceDivisionPage(): React.ReactElement {
                     <p className="mt-1 text-xs text-gold">{selectedImage.category}</p>
                   </div>
                   <span className="text-xs text-background/50">
-                    {currentIndex + 1} {t("finance.gallery.of")} {galleryImages.length}
+                    {currentIndex + 1} {t("finance.gallery.of")} {images.length}
                   </span>
                 </div>
                 <p className="mt-2 text-sm text-background/80">{selectedImage.details}</p>

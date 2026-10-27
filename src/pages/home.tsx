@@ -219,7 +219,7 @@ function RadioHighlight() {
               <div className="mt-4 text-center">
                 <button onClick={openPopup} className="inline-flex items-center gap-2 rounded-full border border-background/30 px-7 py-4 text-sm font-semibold text-background transition hover:border-gold hover:text-gold">
                   <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4"><path d="M8 5v14l11-7z" /></svg>
-                  {t("home.radio.listen")}
+                  {t("home.radio.popup")}
                 </button>
               </div>
             </div>
