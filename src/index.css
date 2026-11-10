@@ -277,6 +277,16 @@ html.light .gradient-text {
   background-clip: text;
 }
 
+/* Horizontal menus that overflow (e.g. long Afaan Oromo labels) scroll
+   without showing a scrollbar, so the language selector stays visible. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Range Inputs */
 input[type="range"] {
   -webkit-appearance: none;

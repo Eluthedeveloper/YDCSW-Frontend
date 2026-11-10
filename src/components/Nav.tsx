@@ -219,7 +219,7 @@ export function Nav(): React.ReactElement {
           transparent ? "opacity-0" : "opacity-100"
         }`}
       />
-      <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-2 px-4 lg:h-20 lg:px-8">
+      <nav className="mx-auto flex h-16 max-w-screen-2xl items-center justify-between gap-2 px-4 lg:h-20 lg:px-8">
         {/* Logo & Brand */}
         <Link to="/" className="group flex shrink-0 items-center gap-3 text-background">
           <span className="relative flex h-11 w-11 shrink-0 items-center justify-center">
@@ -241,7 +241,7 @@ export function Nav(): React.ReactElement {
         </Link>
 
         {/* Desktop navigation */}
-        <ul className="hidden shrink-0 items-center gap-0 text-[13px] font-medium lg:flex">
+        <ul className="no-scrollbar hidden min-w-0 flex-1 items-center justify-start gap-0 overflow-x-auto text-[13px] font-medium lg:flex">
           <li>
             <NavLink to="/" end className={desktopLink}>
               {t("nav.home")}
