@@ -1,6 +1,8 @@
 
 const om = {
   nav: {
+    brand: "Sagalee Misiraachoo",
+    communicationService: "Tajaajila Qunnamtii",
     home: "Fuula Jalqabaa",
     services: "Tajaajila",
     leadership: "Hooggansa",
@@ -20,7 +22,10 @@ const om = {
     finance: "Kutaa Faayinaansii fi Bulchiinsaa Qabeenya Humna Namaa",
     resource: "Kutaa Qabeenya Walitti Qabuu fi Misooma Dinagdee",
     programs: "Kuusaalee Sagantaa",
+    blog: "Oduu fi Blogii",
     bookshops: "Mana Kitaabaa Dhiyoo Keessan Daawwadhaa",
+    openMenu: "Baafata bani",
+    closeMenu: "Baafata cufi",
   },
   bookshops: {
     metaTitle: "Mana Kitaabaa Dhiyoo Keessan Daawwadhaa | Sagalee Misiraachoo",
@@ -66,6 +71,7 @@ const om = {
       heading: "Wangeela bakka hundaatti dhaggeefadha.",
       desc: "Raadiyo Sagalee Missirachoo waaqeffannaa, barsiisa, fi ragaa yeroo hunda tamsaasa. Akka oofnu, hojjemnu ykn kadhannu, nu waliin jirta.",
       listen: "Tamsaasaa Kallattii dhaggeffadhaa",
+      comingSoon: "Dhiyootti ni Eega",
       hide: "Raadiyoo cufi",
       schedule: "Toora Sagantaa keenya",
       popup: "Akkasitti caqasuuf foddaa haaraa bani",
@@ -120,6 +126,17 @@ const om = {
         sat: "Sanbata",
         sun: "Dilbata",
       },
+    },
+    shortwave: {
+      title: "Sagantaan Tamsaasa Haqaa Ta'a",
+      desc: "Tamsaasni haqaa ta'e guyyaan keenya intarneetii caalaa iddoo fageenya bira gaa'a. Naannoo kee argadhuitti dhaggeeffadhu.",
+      time: "Sa'aati (Idiloo)",
+      frequency: "Dachaa",
+      language: "Afaan / Naannoo",
+      program: "Sagantaa",
+      loading: "Sagantaan tamsaasa haqaa ta'e dhufaa jira…",
+      empty: "Tamsaasota haqaa ta'an yeroo dhiyoo as kaa'amu.",
+      reload: "Irra deebi'ii yaali",
     },
   },
   about: {
@@ -526,11 +543,11 @@ const om = {
       "Akkamitti isin wajjin hojjechuu danda'a?",
     ],
     errorGeneric: "Dhiifama, amma deebisuu hin dandeenye. Maaloo irra deebi'ii yaalaa.",
-    errorRate: "Ergaa baay'ee saffisaan ergaa jirtu. Maaloo xiqqoo eegaa irra deebi'aa.",
+    errorRate: "Gargaaraan amma daangaa isaa gaheera. Maaloo booda irra deebi'aa yaalaa.",
     errorOffline: "Amma gargaaraa bira hin geenye. Maaloo qunnamtii intarneetii keessan mirkaneessaa.",
     tooLong: "Ergaan keessan baay'ee dheeraa dha. Maaloo qubee {{max}} gadiitti daangessaa.",
     disclaimer:
-      "Deebiin AI'n uumame dogoggora qabaachuu danda'a. Odeeffannoo sirriif info@yemisrachdimts.org qunnamaa.",
+      "Deebiin AI'n barreefame dogoggora qabaachuu danda'a. Odeeffannoo sirriif info@yemisrachdimts.org qunnamaa.",
     close: "Chat cufi",
     open: "Chat bani",
     reset: "Haasawa haaraa jalqabi",
@@ -552,9 +569,9 @@ const om = {
     gospelStatement: "Wangeelli gurguramaa hin turre.",
     gospelStatementAmharic: "ወንጌል ለሽያጭ አልተዘጋጀም።",
     gospelStatementOromo: "Wangeelli gurguramuuf hin qophoofne.",
-    rights: "© 2025 Sagalee Missirachoo Dhimmaa. Mirgaan hundi eegameera.",
-    rightsAmharic: "© 2025 የምሥራች ድምጽ አገልግሎት. ሁሉም መብቶች የተጠበቁ ናቸው።",
-    rightsOromo: "© 2025 Sagalee Missirachoo Dhimmaa. Mirgaan hundi eegameera.",
+    rights: "© 2025 Sagalee Misiraachoo Dhimmaa. Mirgaan hundi eegameera.",
+    rightsAmharic: "© 2025 የምሥራች ድምፅ አገልግሎት. ሁሉም መብቶች የተጠበቁ ናቸው።",
+    rightsOromo: "© 2025 Sagalee Misiraachoo Dhimmaa. Mirgaan hundi eegameera.",
   },
 };
 

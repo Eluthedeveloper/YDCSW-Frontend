@@ -32,6 +32,7 @@
   --color-gold: var(--gold);
   --color-gold-foreground: var(--gold-foreground);
   --font-serif: "Cormorant Garamond", Georgia, serif;
+  --font-display: "Outfit", system-ui, sans-serif;
   --font-sans: "Inter", system-ui, sans-serif;
   --color-primary-50: #f0f4ff;
   --color-primary-100: #dbe4ff;

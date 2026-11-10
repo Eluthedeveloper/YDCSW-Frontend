@@ -143,7 +143,7 @@ export function RadioSchedule(): React.ReactElement {
 
   // DB is the source of truth; the static grid above is just the offline
   // fallback, so a backend hiccup briefly degrades instead of blanking.
-  const { data: slots, loading, error, reload } = useAsyncData<RadioSlot[]>(
+  const { data: slots } = useAsyncData<RadioSlot[]>(
     () => api.getRadioSchedule().catch(() => []),
     []
   );
@@ -168,7 +168,7 @@ export function RadioSchedule(): React.ReactElement {
   });
 
   return (
-    <section className="bg-secondary py-24 lg:py-32">
+    <section id="schedule" className="scroll-mt-24 bg-secondary py-24 lg:py-32">
       <div className="mx-auto max-w-6xl px-6 lg:px-12">
         <div className="text-center">
           <p className="text-xs uppercase tracking-[0.3em] text-gold">{t("home.schedule.tag")}</p>

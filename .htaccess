@@ -53,6 +53,16 @@
     <Files "index.html">
         Header set Cache-Control "no-cache, no-store, must-revalidate"
     </Files>
+
+    # The program-library service worker and its scoped manifest must never be
+    # cached, or a deploy could keep a stale worker/manifest alive past the
+    # point where the new build is live.
+    <Files "sw.js">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+    </Files>
+    <Files "manifest.webmanifest">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+    </Files>
 </IfModule>
 
 # ---------------------------------------------------------------------------
@@ -68,4 +78,9 @@
     ExpiresByType text/javascript "access plus 1 year"
     ExpiresByType image/svg+xml "access plus 1 year"
     ExpiresByType font/woff2 "access plus 1 year"
+
+    # Keep the service worker out of the one-year JS cache above.
+    <Files "sw.js">
+        ExpiresActive Off
+    </Files>
 </IfModule>

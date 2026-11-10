@@ -3,6 +3,8 @@
 
 const en = {
   nav: {
+    brand: "Yemisrach Dimts",
+    communicationService: "Communication Service",
     home: "Home",
     services: "Our Services",
     leadership: "Leadership",
@@ -25,6 +27,8 @@ const en = {
     blog: "News & Blog",
     language: "Language",
     bookshops: "Visit a Bookshop Near You",
+    openMenu: "Open menu",
+    closeMenu: "Close menu",
   },
   bookshops: {
     metaTitle: "Visit a Bookshop Near You | Yemisrach Dimts",
@@ -77,6 +81,7 @@ const en = {
       heading: "Tune in to the Gospel, anywhere.",
       desc: "Yemisrach Dimts Radio streams worship, teaching, and testimonies around the clock. Whether you're driving, working, or praying, we're with you.",
       listen: "Listen Live",
+      comingSoon: "Coming Soon",
       hide: "Hide Player",
       schedule: "View Schedule",
       popup: "Open in popup window (for background listening)",
@@ -131,6 +136,17 @@ const en = {
         sat: "Sat",
         sun: "Sun",
       },
+    },
+    shortwave: {
+      title: "Shortwave Broadcast Schedule",
+      desc: "Our daily shortwave transmissions reach listeners far beyond the internet. Find your region and tune in.",
+      time: "Time (Local)",
+      frequency: "Frequency",
+      language: "Language / Region",
+      program: "Program",
+      loading: "Loading the shortwave schedule…",
+      empty: "Shortwave broadcasts will be listed here soon.",
+      reload: "Try again",
     },
   },
   about: {
@@ -572,7 +588,7 @@ const en = {
       "How can I partner with you?",
     ],
     errorGeneric: "Sorry, I couldn't answer that just now. Please try again.",
-    errorRate: "You're sending messages too quickly. Please wait a moment and try again.",
+    errorRate: "The assistant has reached its limit right now. Please try again later.",
     errorOffline: "I can't reach the assistant right now. Please check your connection.",
     tooLong: "Your message is too long. Please keep it under {{max}} characters.",
     disclaimer:
@@ -599,8 +615,8 @@ const en = {
     gospelStatementAmharic: "ወንጌል ለሽያጭ አልተዘጋጀም።",
     gospelStatementOromo: "Wangeelli gurgurtaaf hin qophoofne.",
     rights: "© 2025 Yemisrach Dimts Communication Services. All rights reserved.",
-    rightsAmharic: "© 2025 የምሥራች ድምጽ አገልግሎት. ሁሉም መብቶች የተጠበቁ ናቸው።",
-    rightsOromo: "© 2025 Sagalee Missirachoo Dhimmaa. Mirgaan hundi eegameera.",
+    rightsAmharic: "© 2025 የምሥራች ድምፅ አገልግሎት. ሁሉም መብቶች የተጠበቁ ናቸው።",
+    rightsOromo: "© 2025 Sagalee Misiraachoo Dhimmaa. Mirgaan hundi eegameera.",
   },
 };
 

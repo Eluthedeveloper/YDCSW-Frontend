@@ -144,7 +144,7 @@ export default function UsersPage() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-1">
-                      {u.id !== currentUser?.id && u.role === 'admin' && (
+                      {u.id !== currentUser?.id && u.role !== 'super_admin' && (
                         <button onClick={() => { setResetUser(u); setNewPassword(''); setShowPassword(false); }}
                           className="p-1.5 rounded dark:text-dark-300 text-dark-500 hover:text-primary-400 hover:bg-primary-500/10 transition-all" title="Reset Password">
                           <KeyRound size={14} />
@@ -192,6 +192,7 @@ export default function UsersPage() {
                 <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as CreateUserInput['role'] })}
                   className="w-full px-4 py-3 dark:bg-dark-600 bg-white border dark:border-white/5 border-dark-300 rounded-lg dark:text-white text-dark-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600">
                   <option value="admin">Admin</option>
+                  <option value="editor">Editor</option>
                   <option value="super_admin">Super Admin</option>
                 </select>
               </div>

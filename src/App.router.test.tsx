@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 
 /**
  * Mounting the real route tree is the only reliable guard against the router
@@ -12,13 +12,14 @@ import { render, screen } from '@testing-library/react';
 const fetchMock = vi.fn();
 
 const SUPER_ADMIN = { id: 'u1', username: 'superadmin', role: 'super_admin', email: 's@a.com' };
+const EDITOR = { id: 'u2', username: 'editor', role: 'editor', email: 'e@a.com' };
 
 /**
  * One mock has to answer every call the app makes: `/auth/me` with a user and
  * the list endpoints with arrays. Returning a single canned body made list
  * pages crash on `programs.map`, so responses are keyed by URL instead.
  */
-function mockApi({ signedIn = false }: { signedIn?: boolean } = {}) {
+function mockApi({ signedIn = false, user = SUPER_ADMIN }: { signedIn?: boolean; user?: typeof SUPER_ADMIN } = {}) {
   fetchMock.mockImplementation((input: RequestInfo | URL) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
 
@@ -26,7 +27,7 @@ function mockApi({ signedIn = false }: { signedIn?: boolean } = {}) {
       return Promise.resolve({
         ok: true,
         status: 200,
-        json: async () => (signedIn ? SUPER_ADMIN : null),
+        json: async () => (signedIn ? user : null),
         text: async () => '',
       });
     }
@@ -102,5 +103,23 @@ describe('App router wiring', () => {
     window.history.pushState({}, '', '/admin/player/not-a-section');
     render(<App />);
     expect(await screen.findByRole('heading', { name: 'Programs' }, { timeout: 5_000 })).toBeTruthy();
+  });
+
+  // Editors publish content only; the other console sections are off-limits.
+  it('sends an editor from a non-content section to site content', async () => {
+    mockApi({ signedIn: true, user: EDITOR });
+    const App = await loadApp();
+    window.history.pushState({}, '', '/admin/player/programs');
+    render(<App />);
+    await waitFor(() => expect(window.location.pathname).toBe('/admin/player/site'));
+    expect(await screen.findByRole('heading', { name: 'Site Content' }, { timeout: 5_000 })).toBeTruthy();
+  });
+
+  it('lets an editor open the blog section', async () => {
+    mockApi({ signedIn: true, user: EDITOR });
+    const App = await loadApp();
+    window.history.pushState({}, '', '/admin/player/blog');
+    render(<App />);
+    expect(await screen.findByRole('heading', { name: 'Blog' }, { timeout: 5_000 })).toBeTruthy();
   });
 });

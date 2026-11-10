@@ -13,7 +13,7 @@ export type RepeatMode = 'off' | 'all' | 'one';
  * component keeps i18n out of the provider and lets the player surface these in
  * whichever language is active.
  */
-export type PlaybackErrorCode = 'network' | 'unsupported' | 'unknown';
+export type PlaybackErrorCode = 'notfound' | 'network' | 'unsupported' | 'unknown';
 
 interface PlayerContextType {
   currentTrack: Track | null;
@@ -98,6 +98,23 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     return 'unknown';
   }, []);
 
+  /**
+   * A missing upload and an unsupported codec both surface as MediaError code 4,
+   * so the player cannot tell them apart from the error alone. Ask the server
+   * once, only after a failure, whether the stream URL actually exists. A 404
+   * means the track's row points at an audio file that is no longer on disk,
+   * which deserves a different message than an unsupported format.
+   */
+  const detectMissingSource = useCallback(async (src: string): Promise<PlaybackErrorCode> => {
+    try {
+      const res = await fetch(src, { method: 'HEAD' });
+      return res.status === 404 ? 'notfound' : 'unsupported';
+    } catch {
+      // Network failure or a CORS rejection; keep the original diagnosis.
+      return 'unsupported';
+    }
+  }, []);
+
   // Records a listen only when playback actually starts and at most once
   // per track per minute, so replays/repeated clicks don't inflate stats.
   const recordListenIfDue = useCallback((track: Track) => {
@@ -148,9 +165,18 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     audio.addEventListener('error', () => {
       const code = classifyMediaError();
       setIsBuffering(false);
-      if (!code) return;
-      setPlaybackError(code);
       setIsPlaying(false);
+      if (!code) return;
+      // Capture the URL so a slow HEAD cannot overwrite the state of a track the
+      // listener has since switched to.
+      const src = audio.src;
+      if (code === 'unsupported') {
+        void detectMissingSource(src).then((next) => {
+          if (audioRef.current?.src === src) setPlaybackError(next);
+        });
+      } else {
+        setPlaybackError(code);
+      }
     });
 
     audio.addEventListener('playing', () => {
@@ -205,13 +231,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       audioRef.current.play()
         .then(() => setIsPlaying(true))
         .catch((err: unknown) => {
-          // A rejected play() is either a missing file or an autoplay block.
-          // Both used to be swallowed into the console, leaving the play
-          // button inert with nothing on screen to explain why.
-          console.error('Playback failed:', err);
           setIsPlaying(false);
           setIsBuffering(false);
-          setPlaybackError(classifyMediaError());
+          // A missing or unsupported source also fires the element's `error`
+          // event, which sets the specific message (and runs the 404 check).
+          // Logging it here as well only duplicated that in the console.
+          if (err instanceof Error && err.name === 'NotSupportedError') return;
+          // What remains is an autoplay block, which the element cannot report.
+          console.warn('Playback could not start:', err);
+          setPlaybackError(classifyMediaError() ?? 'unknown');
         });
     }
   }, [initAudioContext, classifyMediaError]);
@@ -236,11 +264,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       }
       audioRef.current.play()
         .catch((err: unknown) => {
-          // Same treatment as play(): a silent console.error left the resume
-          // button looking dead with nothing on screen explaining why.
-          console.error('Playback failed:', err);
           setIsBuffering(false);
-          setPlaybackError(classifyMediaError());
+          // Same treatment as play(): the element's `error` event covers a
+          // missing/unsupported source, so only autoplay blocks need reporting.
+          if (err instanceof Error && err.name === 'NotSupportedError') return;
+          console.warn('Playback could not start:', err);
+          setPlaybackError(classifyMediaError() ?? 'unknown');
         });
     }
   }, [initAudioContext, classifyMediaError]);

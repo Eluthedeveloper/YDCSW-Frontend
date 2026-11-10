@@ -15,7 +15,13 @@ export default function Sidebar({ activePage, collapsed, onToggleCollapse }: Sid
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const menuItems = [
+  const isEditor = user?.role === 'editor';
+
+  // Editors only publish content; the rest of the console stays with admins.
+  const menuItems = isEditor ? [
+    { id: 'site', label: 'Site Content', icon: Globe },
+    { id: 'blog', label: 'Blog', icon: Newspaper },
+  ] : [
     { id: 'programs', label: 'Programs', icon: FolderOpen },
     { id: 'player', label: 'Player', icon: Music },
     { id: 'site', label: 'Site Content', icon: Globe },

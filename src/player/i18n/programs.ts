@@ -89,6 +89,7 @@ export const programsEn = {
     unknownArtist: "Unknown Artist",
   },
   playbackError: {
+    notfound: "This audio file is missing on the server. Please try another track.",
     network: "Couldn't load this audio. Check your connection.",
     unsupported: "This audio file isn't supported by your browser.",
     unknown: "Playback failed. Please try again.",
@@ -125,7 +126,7 @@ export const programsAm: typeof programsEn = {
   },
   home: {
     welcome: "እንኳን ደህና መጡ",
-    brand: "የምስራች ድምጽ ፕሮግራም ቤተ መዛግብት",
+    brand: "የምሥራች ድምፅ ፕሮግራም ቤተ መዛግብት",
     description:
       "ሕይወት ለሚቀይሩ የመጽሐፍ ቅዱስ ትምህርቶች ይተዋወቁ፣ ስለ ኢየሱስ ክርስቶስ ያለዎትን እውቀት ያሳድጉ፣ በሚያነቃቁ መልእክቶችና በክርስቲያናዊ ፕሮግራሞች አማካኝነት እምነትዎን ያጠናክሩ።",
     featuredPrograms: "ተመራጭ ፕሮግራሞች",
@@ -200,7 +201,7 @@ export const programsAm: typeof programsEn = {
     search: "ፈልግ",
     backHome: "ወደ መነሻ ተመለስ",
     admin: "አስተዳዳሪ",
-    brand: "የምስራች ድምጽ",
+    brand: "የምሥራች ድምፅ",
   },
   audioPlayer: {
     playingFrom: "እየተጫወተ ያለው ከ",
@@ -208,6 +209,7 @@ export const programsAm: typeof programsEn = {
     unknownArtist: "አልታወቀ አርቲስት",
   },
   playbackError: {
+    notfound: "ይህ የድምጽ ፋይል በአገልጋዩ ላይ አልተገኘም። እባክዎ ሌላ ትራክ ይሞክሩ።",
     network: "ይህን ድምጽ መጫን አልተቻለም። የግንኙነትዎን ያረጋግጡ።",
     unsupported: "የዚህ ድምጽ ፋይል በአሳሽርዎ አይደገፍም።",
     unknown: "ማጫወት አልተሳካም። እንደገና ይሞክሩ።",
@@ -248,7 +250,7 @@ export const programsOm: typeof programsEn = {
   },
   home: {
     welcome: "Baga Nagaan Dhuftan",
-    brand: "Kuusaa Piroogiraamii Yemisrach Dimts",
+    brand: "Kuusaa Piroogiraamii Sagalee Misiraachoo",
     description:
       "Barsiisota Kitaaba Qulqulluu jireenya geeddaran argadhu, beekumsa kee waa'ee Yesus Kiristoos guddisi, ergaawwan onnachiisaa fi piroogiraamota Kiristaanaa karaa amantii kee jabeessi.",
     featuredPrograms: "Piroogiraamota Filatamoo",
@@ -323,7 +325,7 @@ export const programsOm: typeof programsEn = {
     search: "Barbaadi",
     backHome: "Fuula Jalqabaa Deebi'i",
     admin: "Admin",
-    brand: "Yemisrach Dimts",
+    brand: "Sagalee Misiraachoo",
   },
   audioPlayer: {
     playingFrom: "Irraa taphachaa jira",
@@ -331,7 +333,8 @@ export const programsOm: typeof programsEn = {
     unknownArtist: "Artistii Hin Beekamne",
   },
   playbackError: {
-    network: "Kutaa kana hin dheeffine. Walqixxtee kee qaba.",
+    notfound: "Faayiliin sagalee kanaa tajaajila irratti hin argamne. Maaloo faaya biraa yaali.",
+    network: "Kutaa kana hin dheeffine. Walqixxee kee qaba.",
     unsupported: "Kutaan kana biraa miilaan hin dhaqqabu.",
     unknown: "Taphachaa hin guutumne. Irra deebi'i.",
     retry: "Irra deebi'i",

@@ -1,5 +1,5 @@
 // src/components/Nav.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import logo from "../assets/Logo.png";
@@ -15,6 +15,7 @@ export function Nav(): React.ReactElement {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileAboutOpen, setMobileAboutOpen] = useState(false);
   const [mobileDeptOpen, setMobileDeptOpen] = useState(false);
+  const drawerRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -68,6 +69,64 @@ export function Nav(): React.ReactElement {
     setMobileDeptOpen(false);
   };
 
+  // The link handlers close the drawer on a click, but a browser Back/forward
+  // navigation would otherwise leave it open on top of the new page. Listening
+  // for popstate rather than reacting to `pathname` keeps this out of the
+  // render cycle and covers exactly the history-nav case links don't.
+  useEffect(() => {
+    const onPopState = () => {
+      setMobileOpen(false);
+      setMobileAboutOpen(false);
+      setMobileDeptOpen(false);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  // Treat the mobile drawer as a real dialog: move focus inside when it opens,
+  // keep Tab within it, and hand focus back to the control that opened it.
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const drawer = drawerRef.current;
+    if (!drawer) return;
+
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+
+    const focusable = () =>
+      Array.from(
+        drawer.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter((el) => el.offsetParent !== null);
+
+    (focusable()[0] ?? drawer).focus();
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMobileOpen(false);
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const items = focusable();
+      if (items.length === 0) return;
+      const firstEl = items[0];
+      const lastEl = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === firstEl) {
+        e.preventDefault();
+        lastEl.focus();
+      } else if (!e.shiftKey && document.activeElement === lastEl) {
+        e.preventDefault();
+        firstEl.focus();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      previouslyFocused?.focus?.();
+    };
+  }, [mobileOpen]);
+
   const changeLanguage = (lng: string) => {
     i18n.changeLanguage(lng);
   };
@@ -97,6 +156,31 @@ export function Nav(): React.ReactElement {
     { code: "om", label: "OR" },
   ];
 
+  // Shared visual treatments. Keeping them here rather than repeating a long
+  // class string on every link makes the active/hover states stay in sync.
+  const desktopLink = ({ isActive }: { isActive: boolean }) =>
+    `relative inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-2 transition-colors duration-200 after:absolute after:inset-x-2.5 after:-bottom-0.5 after:h-px after:origin-left after:scale-x-0 after:bg-gold after:transition-transform after:duration-300 after:content-[''] hover:text-gold hover:after:scale-x-100 ${
+      isActive ? "text-gold after:scale-x-100" : "text-background/80"
+    }`;
+  const desktopTrigger = (active: boolean) =>
+    `flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-2 transition-colors duration-200 hover:text-gold ${
+      active ? "text-gold" : "text-background/80"
+    }`;
+  const dropdownItem =
+    "block rounded-xl px-4 py-2.5 text-sm text-background/80 transition hover:bg-gold/10 hover:text-gold";
+  const mobileLink = ({ isActive }: { isActive: boolean }) =>
+    `block rounded-xl px-4 py-3 text-sm font-medium transition ${
+      isActive
+        ? "bg-gold/10 text-gold"
+        : "text-background/80 hover:bg-white/5 hover:text-gold"
+    }`;
+  const mobileTrigger = (active: boolean) =>
+    `flex w-full items-center justify-between rounded-xl px-4 py-3 text-sm font-medium transition hover:bg-white/5 hover:text-gold ${
+      active ? "bg-gold/10 text-gold" : "text-background/80"
+    }`;
+  const mobileSubLink =
+    "block rounded-lg px-4 py-2 text-sm text-background/70 transition hover:bg-white/5 hover:text-gold";
+
   // A compact select rather than a row of three buttons: the header was
   // getting crowded, and a native select also opens the language menu from
   // the mobile drawer without extra state.
@@ -109,7 +193,7 @@ export function Nav(): React.ReactElement {
         id="site-language"
         value={i18n.resolvedLanguage || "en"}
         onChange={(e) => changeLanguage(e.target.value)}
-        className="cursor-pointer rounded-full border border-background/15 bg-transparent px-2 py-1 text-xs font-semibold tracking-wide text-background/80 transition hover:border-gold/40 hover:text-gold focus:border-gold focus:outline-none"
+        className="shrink-0 cursor-pointer rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold tracking-wide text-background/80 transition hover:border-gold/40 hover:text-gold focus:border-gold focus:outline-none"
       >
         {LANGUAGES.map(({ code, label }) => (
           <option key={code} value={code} className="bg-primary text-background">
@@ -122,41 +206,44 @@ export function Nav(): React.ReactElement {
 
   return (
     <header
-      className={`${isHome ? "fixed" : "sticky"} top-0 left-0 right-0 z-30 transition-colors duration-300 ${
-        transparent ? "bg-transparent" : "bg-primary/95 backdrop-blur shadow-[0_1px_0_0_oklch(1_0_0/0.06)]"
+      className={`${isHome ? "fixed" : "sticky"} top-0 left-0 right-0 z-30 transition-all duration-300 ${
+        transparent
+          ? "bg-transparent"
+          : "bg-primary/95 shadow-[0_10px_40px_-18px_oklch(0.18_0.04_260/0.65)] backdrop-blur-xl"
       }`}
     >
-      <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2 lg:px-8">
+      {/* Hairline accent that fades in once the bar becomes solid. */}
+      <div
+        aria-hidden
+        className={`pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-gold/60 to-transparent transition-opacity duration-300 ${
+          transparent ? "opacity-0" : "opacity-100"
+        }`}
+      />
+      <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-2 px-4 lg:h-20 lg:px-8">
         {/* Logo & Brand */}
-        <Link to="/" className="flex items-center gap-2 text-background group">
-          <img
-            src={logo}
-            alt="EECMY-YDCS Logo"
-            className="h-12 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
-          />
-          <div className="flex flex-col leading-tight">
-            <span className="font-display text-base font-bold tracking-tight text-background transition-colors group-hover:text-gold">
-              Yemisrach Dimts
+        <Link to="/" className="group flex shrink-0 items-center gap-3 text-background">
+          <span className="relative flex h-11 w-11 shrink-0 items-center justify-center">
+            <span className="absolute inset-0 rounded-full bg-gold/15 opacity-0 blur-md transition-opacity duration-300 group-hover:opacity-100" />
+            <img
+              src={logo}
+              alt="EECMY-YDCS Logo"
+              className="relative h-11 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
+            />
+          </span>
+          <span className="flex flex-col leading-tight">
+            <span className="whitespace-nowrap font-display text-base font-semibold leading-none tracking-tight text-background transition-colors group-hover:text-gold sm:text-lg">
+              {t("nav.brand")}
             </span>
-            <span className="font-display text-[10px] font-medium tracking-wide text-gold/80">
-              Ethiopian Evangelical Church Mekane Yesus
+            <span className="hidden whitespace-nowrap font-mono text-[9px] font-medium uppercase tracking-[0.18em] text-gold/80 sm:block">
+              {t("nav.communicationService")} · EECMY
             </span>
-            <span className="font-mono text-[8px] font-semibold uppercase tracking-wider text-background/50">
-              EECMY-YDCS
-            </span>
-          </div>
+          </span>
         </Link>
 
         {/* Desktop navigation */}
-        <ul className="hidden items-center gap-5 text-sm font-medium text-background/80 lg:flex">
+        <ul className="hidden shrink-0 items-center gap-0 text-[13px] font-medium lg:flex">
           <li>
-            <NavLink
-              to="/"
-              end
-              className={({ isActive }) =>
-                `transition hover:text-gold ${isActive ? "text-gold" : ""}`
-              }
-            >
+            <NavLink to="/" end className={desktopLink}>
               {t("nav.home")}
             </NavLink>
           </li>
@@ -165,21 +252,27 @@ export function Nav(): React.ReactElement {
               onClick={() => setAboutOpen((p) => !p)}
               aria-expanded={aboutOpen}
               aria-haspopup="true"
-              className={`flex items-center gap-1 transition hover:text-gold ${
-                pathname === "/about" || aboutOpen ? "text-gold" : ""
-              }`}
+              className={desktopTrigger(
+                pathname === "/about" || pathname === "/leadership" || aboutOpen
+              )}
             >
               {t("nav.about")}
-              <svg viewBox="0 0 24 24" fill="none" className="h-3 w-3" stroke="currentColor" strokeWidth="2.5">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                className={`h-3 w-3 transition-transform duration-200 ${aboutOpen ? "rotate-180" : ""}`}
+                stroke="currentColor"
+                strokeWidth="2.5"
+              >
                 <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
             {aboutOpen && (
-              <div className="absolute top-full left-0 mt-2 w-56 overflow-hidden rounded-xl border border-gold/20 bg-primary/95 p-2 shadow-[var(--shadow-elegant)] backdrop-blur">
+              <div className="absolute top-full left-0 mt-3 w-60 origin-top-left overflow-hidden rounded-2xl border border-white/10 bg-primary/95 p-2 shadow-[var(--shadow-elegant)] ring-1 ring-gold/10 backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-150">
                 <Link
                   to="/about"
                   onClick={() => setAboutOpen(false)}
-                  className="block rounded-lg px-4 py-2.5 text-sm text-background/80 transition hover:bg-gold/10 hover:text-gold"
+                  className={dropdownItem}
                 >
                   {t("nav.aboutYdcs")}
                 </Link>
@@ -188,7 +281,7 @@ export function Nav(): React.ReactElement {
                     key={item.label}
                     to={item.to}
                     onClick={() => setAboutOpen(false)}
-                    className="block rounded-lg px-4 py-2.5 text-sm text-background/80 transition hover:bg-gold/10 hover:text-gold"
+                    className={dropdownItem}
                   >
                     {item.label}
                   </Link>
@@ -197,32 +290,17 @@ export function Nav(): React.ReactElement {
             )}
           </li>
           <li>
-            <NavLink
-              to="/services"
-              className={({ isActive }) =>
-                `transition hover:text-gold ${isActive ? "text-gold" : ""}`
-              }
-            >
+            <NavLink to="/services" className={desktopLink}>
               {t("nav.services")}
             </NavLink>
           </li>
           <li>
-            <NavLink
-              to="/programs"
-              className={({ isActive }) =>
-                `transition hover:text-gold ${isActive ? "text-gold" : ""}`
-              }
-            >
+            <NavLink to="/programs" className={desktopLink}>
               {t("nav.programs")}
             </NavLink>
           </li>
           <li>
-            <NavLink
-              to="/blog"
-              className={({ isActive }) =>
-                `transition hover:text-gold ${isActive ? "text-gold" : ""}`
-              }
-            >
+            <NavLink to="/blog" className={desktopLink}>
               {t("nav.blog")}
             </NavLink>
           </li>
@@ -231,23 +309,27 @@ export function Nav(): React.ReactElement {
               onClick={() => setDeptOpen((p) => !p)}
               aria-expanded={deptOpen}
               aria-haspopup="true"
-              className={`flex items-center gap-1 transition hover:text-gold ${
-                deptOpen ? "text-gold" : ""
-              }`}
+              className={desktopTrigger(pathname.startsWith("/divisions") || deptOpen)}
             >
               {t("nav.divisions")}
-              <svg viewBox="0 0 24 24" fill="none" className="h-3 w-3" stroke="currentColor" strokeWidth="2.5">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                className={`h-3 w-3 transition-transform duration-200 ${deptOpen ? "rotate-180" : ""}`}
+                stroke="currentColor"
+                strokeWidth="2.5"
+              >
                 <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
             {deptOpen && (
-              <div className="absolute top-full left-0 mt-2 w-64 overflow-hidden rounded-xl border border-gold/20 bg-primary/95 p-2 shadow-[var(--shadow-elegant)] backdrop-blur">
+              <div className="absolute top-full left-0 mt-3 w-72 origin-top-left overflow-hidden rounded-2xl border border-white/10 bg-primary/95 p-2 shadow-[var(--shadow-elegant)] ring-1 ring-gold/10 backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-150">
                 {DIVISIONS.map((d) => (
                   <Link
                     key={d.label}
                     to={d.to}
                     onClick={() => setDeptOpen(false)}
-                    className="block rounded-lg px-4 py-2.5 text-sm text-background/80 transition hover:bg-gold/10 hover:text-gold"
+                    className={dropdownItem}
                   >
                     {d.label}
                   </Link>
@@ -256,35 +338,34 @@ export function Nav(): React.ReactElement {
             )}
           </li>
           <li>
-            <NavLink
-              to="/gallery"
-              className={({ isActive }) =>
-                `transition hover:text-gold ${isActive ? "text-gold" : ""}`
-              }
-            >
+            <NavLink to="/gallery" className={desktopLink}>
               {t("nav.gallery")}
             </NavLink>
           </li>
           <li>
-            <NavLink
-              to="/contact"
-              className={({ isActive }) =>
-                `transition hover:text-gold ${isActive ? "text-gold" : ""}`
-              }
-            >
+            <NavLink to="/contact" className={desktopLink}>
               {t("nav.contact")}
             </NavLink>
           </li>
         </ul>
 
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-2">
           <NotificationBell />
 
           <Link
             to="/contact"
-            className="hidden rounded-full bg-gold px-4 py-1.5 text-xs font-semibold text-gold-foreground shadow-[var(--shadow-gold)] transition hover:scale-105 lg:inline-block"
+            className="group hidden shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-[image:var(--gradient-gold)] px-5 py-2 text-xs font-semibold text-gold-foreground shadow-[var(--shadow-gold)] ring-1 ring-white/20 transition hover:brightness-105 hover:shadow-[0_14px_40px_-10px_oklch(0.72_0.13_75/0.75)] xl:inline-flex"
           >
             {t("nav.partner")}
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5"
+              stroke="currentColor"
+              strokeWidth="2.5"
+            >
+              <path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </Link>
 
           {/* One compact select serves both desktop and the mobile bar. */}
@@ -292,8 +373,10 @@ export function Nav(): React.ReactElement {
 
           <button
             onClick={() => setMobileOpen(true)}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-background/90 transition hover:bg-gold/10 hover:text-gold lg:hidden"
-            aria-label="Open menu"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/5 text-background/90 transition hover:border-gold/40 hover:text-gold lg:hidden"
+            aria-label={t("nav.openMenu")}
+            aria-expanded={mobileOpen}
+            aria-controls="mobile-menu"
             type="button"
           >
             <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -315,20 +398,28 @@ export function Nav(): React.ReactElement {
 
           {/* Drawer */}
           <aside
+            id="mobile-menu"
+            ref={drawerRef}
             role="dialog"
             aria-modal="true"
-            className="absolute right-0 top-0 flex h-screen w-80 max-w-[85vw] flex-col border-l border-gold/20 bg-primary shadow-2xl animate-in slide-in-from-right duration-200"
+            tabIndex={-1}
+            className="absolute right-0 top-0 flex h-dvh w-80 max-w-[85vw] animate-in flex-col rounded-l-3xl border-l border-white/10 bg-primary shadow-2xl ring-1 ring-gold/10 slide-in-from-right duration-200"
           >
+            {/* Gold accent along the top edge */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-gold/60 to-transparent"
+            />
             {/* Header */}
-            <div className="flex flex-row items-center justify-between border-b border-gold/10 px-4 py-3">
-              <Link to="/" onClick={closeMobile} className="flex items-center gap-2 text-background group">
+            <div className="flex flex-row items-center justify-between border-b border-white/10 px-4 py-3">
+              <Link to="/" onClick={closeMobile} className="group flex items-center gap-2.5 text-background">
                 <img src={logo} alt="EECMY-YDCS Logo" className="h-9 w-auto object-contain" />
                 <div className="flex flex-col leading-tight">
-                  <span className="font-display text-xs font-bold tracking-tight text-background">
-                    EECMY-YDCS
+                  <span className="font-display text-sm font-semibold leading-none tracking-tight text-background">
+                    {t("nav.brand")}
                   </span>
-                  <span className="font-display text-[9px] font-medium text-gold">
-                    Yemisrach Dimts
+                  <span className="font-mono text-[8px] font-medium uppercase tracking-[0.18em] text-gold/80">
+                    EECMY-YDCS
                   </span>
                 </div>
               </Link>
@@ -336,7 +427,7 @@ export function Nav(): React.ReactElement {
                 <NotificationBell className="border border-gold/25" />
                 <button
                   onClick={closeMobile}
-                  aria-label="Close menu"
+                  aria-label={t("nav.closeMenu")}
                   className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-gold/30 text-gold transition hover:bg-gold hover:text-gold-foreground"
                 >
                   <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
@@ -347,16 +438,12 @@ export function Nav(): React.ReactElement {
             </div>
 
             {/* Scrollable navigation */}
-            <nav className="flex-1 overflow-y-auto p-4 space-y-0.5">
+            <nav className="flex-1 space-y-1 overflow-y-auto p-4">
               <NavLink
                 to="/"
                 end
                 onClick={closeMobile}
-                className={({ isActive }) =>
-                  `block rounded-lg px-4 py-2.5 text-sm font-medium transition hover:bg-gold/10 hover:text-gold ${
-                    isActive ? "text-gold" : "text-background/80"
-                  }`
-                }
+                className={mobileLink}
               >
                 {t("nav.home")}
               </NavLink>
@@ -367,9 +454,9 @@ export function Nav(): React.ReactElement {
                   onClick={() => setMobileAboutOpen((p) => !p)}
                   aria-expanded={mobileAboutOpen}
                   aria-haspopup="true"
-                  className={`flex w-full items-center justify-between rounded-lg px-4 py-2.5 text-sm font-medium transition hover:bg-gold/10 hover:text-gold ${
-                    mobileAboutOpen ? "text-gold" : "text-background/80"
-                  }`}
+                  className={mobileTrigger(
+                    mobileAboutOpen || pathname === "/about" || pathname === "/leadership"
+                  )}
                 >
                   {t("nav.about")}
                   <svg
@@ -387,7 +474,7 @@ export function Nav(): React.ReactElement {
                     <Link
                       to="/about"
                       onClick={closeMobile}
-                      className="block rounded-lg px-4 py-2 text-sm text-background/70 transition hover:bg-gold/10 hover:text-gold"
+                      className={mobileSubLink}
                     >
                       {t("nav.aboutYdcs")}
                     </Link>
@@ -396,7 +483,7 @@ export function Nav(): React.ReactElement {
                         key={item.label}
                         to={item.to}
                         onClick={closeMobile}
-                        className="block rounded-lg px-4 py-2 text-sm text-background/70 transition hover:bg-gold/10 hover:text-gold"
+                        className={mobileSubLink}
                       >
                         {item.label}
                       </Link>
@@ -408,11 +495,7 @@ export function Nav(): React.ReactElement {
               <NavLink
                 to="/services"
                 onClick={closeMobile}
-                className={({ isActive }) =>
-                  `block rounded-lg px-4 py-2.5 text-sm font-medium transition hover:bg-gold/10 hover:text-gold ${
-                    isActive ? "text-gold" : "text-background/80"
-                  }`
-                }
+                className={mobileLink}
               >
                 {t("nav.services")}
               </NavLink>
@@ -420,11 +503,7 @@ export function Nav(): React.ReactElement {
               <NavLink
                 to="/programs"
                 onClick={closeMobile}
-                className={({ isActive }) =>
-                  `block rounded-lg px-4 py-2.5 text-sm font-medium transition hover:bg-gold/10 hover:text-gold ${
-                    isActive ? "text-gold" : "text-background/80"
-                  }`
-                }
+                className={mobileLink}
               >
                 {t("nav.programs")}
               </NavLink>
@@ -432,11 +511,7 @@ export function Nav(): React.ReactElement {
               <NavLink
                 to="/blog"
                 onClick={closeMobile}
-                className={({ isActive }) =>
-                  `block rounded-lg px-4 py-2.5 text-sm font-medium transition hover:bg-gold/10 hover:text-gold ${
-                    isActive ? "text-gold" : "text-background/80"
-                  }`
-                }
+                className={mobileLink}
               >
                 {t("nav.blog")}
               </NavLink>
@@ -447,9 +522,9 @@ export function Nav(): React.ReactElement {
                   onClick={() => setMobileDeptOpen((p) => !p)}
                   aria-expanded={mobileDeptOpen}
                   aria-haspopup="true"
-                  className={`flex w-full items-center justify-between rounded-lg px-4 py-2.5 text-sm font-medium transition hover:bg-gold/10 hover:text-gold ${
-                    mobileDeptOpen ? "text-gold" : "text-background/80"
-                  }`}
+                  className={mobileTrigger(
+                    mobileDeptOpen || pathname.startsWith("/divisions")
+                  )}
                 >
                   {t("nav.divisions")}
                   <svg
@@ -469,7 +544,7 @@ export function Nav(): React.ReactElement {
                         key={d.label}
                         to={d.to}
                         onClick={closeMobile}
-                        className="block rounded-lg px-4 py-2 text-sm text-background/70 transition hover:bg-gold/10 hover:text-gold"
+                        className={mobileSubLink}
                       >
                         {d.label}
                       </Link>
@@ -481,11 +556,7 @@ export function Nav(): React.ReactElement {
               <NavLink
                 to="/gallery"
                 onClick={closeMobile}
-                className={({ isActive }) =>
-                  `block rounded-lg px-4 py-2.5 text-sm font-medium transition hover:bg-gold/10 hover:text-gold ${
-                    isActive ? "text-gold" : "text-background/80"
-                  }`
-                }
+                className={mobileLink}
               >
                 {t("nav.gallery")}
               </NavLink>
@@ -493,24 +564,29 @@ export function Nav(): React.ReactElement {
               <NavLink
                 to="/contact"
                 onClick={closeMobile}
-                className={({ isActive }) =>
-                  `block rounded-lg px-4 py-2.5 text-sm font-medium transition hover:bg-gold/10 hover:text-gold ${
-                    isActive ? "text-gold" : "text-background/80"
-                  }`
-                }
+                className={mobileLink}
               >
                 {t("nav.contact")}
               </NavLink>
             </nav>
 
             {/* Fixed footer with Partner button */}
-            <div className="border-t border-gold/10 p-4">
+            <div className="border-t border-white/10 p-4">
               <Link
                 to="/contact"
                 onClick={closeMobile}
-                className="block w-full rounded-full bg-gold px-5 py-2.5 text-center text-sm font-semibold text-gold-foreground shadow-[var(--shadow-gold)] transition hover:scale-105"
+                className="group flex w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-[image:var(--gradient-gold)] px-5 py-3 text-center text-sm font-semibold text-gold-foreground shadow-[var(--shadow-gold)] ring-1 ring-white/20 transition hover:brightness-105"
               >
                 {t("nav.partner")}
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                >
+                  <path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
               </Link>
             </div>
           </aside>

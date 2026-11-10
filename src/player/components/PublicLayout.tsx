@@ -2,10 +2,11 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Home, FolderOpen, Music, Search, Menu, X, ArrowLeft, Newspaper } from 'lucide-react';
+import { Home, FolderOpen, Music, Search, Menu, X, ArrowLeft } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 import Footer from './Footer';
 import NotificationBell from '../../components/NotificationBell';
+import ProgramsPwa from './ProgramsPwa';
 
 interface Props {
   children: ReactNode;
@@ -22,7 +23,6 @@ export default function PublicLayout({ children }: Props) {
     { id: '/programs/all', label: t('publicNav.programs'), icon: FolderOpen },
     { id: '/programs/latest', label: t('publicNav.latestTracks'), icon: Music },
     { id: '/programs/search', label: t('publicNav.search'), icon: Search },
-    { id: '/blog', label: t('publicNav.blog'), icon: Newspaper },
   ];
 
   const isActive = (path: string) => {
@@ -32,6 +32,7 @@ export default function PublicLayout({ children }: Props) {
 
   return (
     <div className="min-h-screen">
+      <ProgramsPwa />
       <header className="glass-panel border-b sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 h-18 flex items-center justify-between">
           <div className="flex items-center gap-8">

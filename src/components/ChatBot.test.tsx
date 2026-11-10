@@ -82,6 +82,23 @@ describe('ChatBot', () => {
     expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
   });
 
+  it('shows the usage-limit message when the assistant is rate limited', async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 429,
+      json: async () => ({ error: 'limited' }),
+    });
+
+    const user = userEvent.setup();
+    renderBot();
+
+    await user.click(screen.getByRole('button', { name: 'Open chat' }));
+    await user.type(screen.getByRole('textbox'), 'Hello');
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/reached its limit/i);
+  });
+
   it('starts a fresh conversation on request', async () => {
     fetchMock.mockResolvedValue({
       ok: true,

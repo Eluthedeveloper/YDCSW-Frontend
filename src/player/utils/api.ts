@@ -4,6 +4,7 @@ import type {
   AuthUser, Comment, MeUpdateInput, CreateUserInput, Program,
   SearchResults, Track, TrackUpdateInput, UserRow,
   Leader, Album, Announcement, SiteEvent, BlogPost, WhatsNewItem, RadioSlot,
+  ShortwaveEntry,
 } from './types';
 
 export const uploadUrl = baseUploadUrl;
@@ -419,6 +420,15 @@ export const api = {
     request<{ message: string }>('/site/schedule', { method: 'PUT', body: JSON.stringify(data) }),
   deleteRadioSlot: (id: string) =>
     request<{ message: string }>(`/site/schedule/${id}`, { method: 'DELETE' }),
+
+  // Daily shortwave broadcasts (time + frequency per transmission).
+  getShortwaveSchedule: () => request<ShortwaveEntry[]>('/site/shortwave'),
+  createShortwaveEntry: (data: Omit<ShortwaveEntry, 'id'>) =>
+    request<ShortwaveEntry>('/site/shortwave', { method: 'POST', body: JSON.stringify(data) }),
+  updateShortwaveEntry: (id: string, data: Omit<ShortwaveEntry, 'id'>) =>
+    request<{ message: string }>(`/site/shortwave/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteShortwaveEntry: (id: string) =>
+    request<{ message: string }>(`/site/shortwave/${id}`, { method: 'DELETE' }),
 
   // Leaders. Create/update are multipart because a photo rides along; the
   // backend reads `req.body` the same way either way.

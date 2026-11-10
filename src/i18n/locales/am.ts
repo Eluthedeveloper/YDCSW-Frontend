@@ -3,6 +3,8 @@
 
 const am = {
   nav: {
+    brand: "የምሥራች ድምፅ",
+    communicationService: "የግንኙነት አገልግሎት",
     home: "መነሻ",
     services: "አገልግሎቶች",
     leadership: "አመራር",
@@ -22,7 +24,10 @@ const am = {
     finance: "የፋይናንስ እና የሰው ኃይል ክፍል",
     resource: "የሀብት ማሰባሰብ እና ኢኮኖሚ ልማት ክፍል",
     programs: "የፕሮግራም ቤተ መዛግብት",
+    blog: "ዜናና ብሎግ",
     bookshops: "በአቅራቢያዎ ያለ የመጽሐፍ መደብር ይጎብኙ",
+    openMenu: "ምናሌ ክፈት",
+    closeMenu: "ምናሌ ዝጋ",
   },
   bookshops: {
     metaTitle: "በአቅራቢያዎ ያለ የመጽሐፍ መደብር ይጎብኙ | የምሥራች ድምጽ",
@@ -68,6 +73,7 @@ const am = {
       heading: "ወንጌልን በማንኛውም ቦታ ያዳምጡ።",
       desc: "የምስራች ድምጽ በዓለም አቀፍ ደረጃ እርዳታ በሚለግሱ ሰዎች ላይ የተመሰረተ ነው፡፡ የእርሶ ድጋፍ ወደ ሚሊዮኖች የሚደርሱትን ፊልሞች፣ የራዲዮ ፕሮግራሞች እና ልዩ ልዩ ግብአቶችን ይደግፋል፡፡",
       listen: "በቀጥታ ያዳምጡ",
+      comingSoon: "በቅርቡ ይመጣል",
       hide: "አጫዋቹን ደብቅ",
       schedule: "መርሃ ግብሩን ይመልከቱ",
       popup: "ለበስተጀርባ ማዳመጥ በአዲስ መስኮት ይክፈቱ",
@@ -122,6 +128,17 @@ const am = {
         sat: "ቀዳም",
         sun: "እሑድ",
       },
+    },
+    shortwave: {
+      title: "የሾርትዌቭ ስርጭት መርሃ ግብር",
+      desc: "ዕለታዊ የሾርትዌቭ ስርጭቶቻችን ኢንተርኔትን ባሻገሩ ቦታዎች ይደረሳሉ። ክልልዎን ያግኙና ያዳምጡ።",
+      time: "ሰዓት (አካባቢ)",
+      frequency: "ድግግሞሽ",
+      language: "ቋንቋ / ክልል",
+      program: "ፕሮግራም",
+      loading: "የሾርትዌቭ መርሃ ግብሩ በመጫን ላይ…",
+      empty: "የሾርትዌቭ ስርጭቶች በቅርቡ እዚህ ይታያሉ።",
+      reload: "እንደገና ይሞክሩ",
     },
   },
   about: {
@@ -533,7 +550,7 @@ const am = {
       "እንዴት አብሬ መሳተፍ እችላለሁ?",
     ],
     errorGeneric: "ይቅርታ፣ አሁን መመለስ አልቻልኩም። እባክዎ እንደገና ይሞክሩ።",
-    errorRate: "በጣም ብዙ መልእክት በፍጥነት እየላኩ ነው። እባክዎ ትንሽ ቆይተው ይሞክሩ።",
+    errorRate: "አጋዥው አሁን ገደቡ ላይ ደርሷል። እባክዎ ቆይተው እንደገና ይሞክሩ።",
     errorOffline: "አሁን አጋዥን ማግኘት አልቻልኩም። እባክዎ የኢንተርኔት ግንኙነትዎን ያረጋግጡ።",
     tooLong: "መልእክትዎ በጣም ረጅም ነው። እባክዎ ከ{{max}} ፊደሎች በታች ያድርጉት።",
     disclaimer:
@@ -559,9 +576,9 @@ const am = {
     gospelStatement: "ወንጌል ለሽያጭ አልተዘጋጀም።",
     gospelStatementAmharic: "ወንጌል ለሽያጭ አልተዘጋጀም።",
     gospelStatementOromo: "Wangeelli gurguramuuf hin qophoofne.",
-    rights: "© 2025 የምሥራች ድምጽ አገልግሎት. ሁሉም መብቶች የተጠበቁ ናቸው።",
-    rightsAmharic: "© 2025 የምሥራች ድምጽ አገልግሎት. ሁሉም መብቶች የተጠበቁ ናቸው።",
-    rightsOromo: "© 2025 Tajaajila Sagalee Missirachoo. Mirgi isa hundi kan eegame!.",
+    rights: "© 2025 የምሥራች ድምፅ አገልግሎት. ሁሉም መብቶች የተጠበቁ ናቸው።",
+    rightsAmharic: "© 2025 የምሥራች ድምፅ አገልግሎት. ሁሉም መብቶች የተጠበቁ ናቸው።",
+    rightsOromo: "© 2025 Tajaajila Sagalee Misiraachoo. Mirgi isa hundi kan eegame!.",
   },
 };
 

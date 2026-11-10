@@ -6,16 +6,16 @@ import { compressImage, compressImages } from '../../lib/compressImage';
 import { toast } from 'sonner';
 import {
   Users, Images, Megaphone, CalendarDays, Plus, Trash2, X, Loader2,
-  ChevronUp, ChevronDown, Pencil, Check, Upload, Pin, Radio,
+  ChevronUp, ChevronDown, Pencil, Check, Upload, Pin, Radio, Signal,
 } from 'lucide-react';
-import type { Leader, Album, AlbumPhoto, Announcement, SiteEvent, RadioSlot } from '../utils/types';
+import type { Leader, Album, AlbumPhoto, Announcement, SiteEvent, RadioSlot, ShortwaveEntry } from '../utils/types';
 
 // Mirrors the backend's image cap (site.ts MAX_PHOTO_BYTES) so an oversized
 // photo is rejected before the upload starts instead of dying in multer.
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 const MAX_IMAGE_MB = MAX_IMAGE_BYTES / (1024 * 1024);
 
-type Tab = 'leaders' | 'albums' | 'announcements' | 'events' | 'radio';
+type Tab = 'leaders' | 'albums' | 'announcements' | 'events' | 'radio' | 'shortwave';
 
 const TABS: Array<{ id: Tab; label: string; icon: typeof Users }> = [
   { id: 'leaders', label: 'Leadership', icon: Users },
@@ -23,6 +23,7 @@ const TABS: Array<{ id: Tab; label: string; icon: typeof Users }> = [
   { id: 'announcements', label: 'Announcements', icon: Megaphone },
   { id: 'events', label: 'Events', icon: CalendarDays },
   { id: 'radio', label: 'Radio Schedule', icon: Radio },
+  { id: 'shortwave', label: 'Shortwave Schedule', icon: Signal },
 ];
 
 /** MySQL DATETIME → the value a `datetime-local` input expects. */
@@ -74,8 +75,14 @@ const departmentLabel = (value?: string | null) =>
   ALBUM_DEPARTMENT_OPTIONS.find((option) => option.value === value)?.label ?? value;
 
 export default function SiteContentPage() {
-  const { isSuperAdmin } = usePlayerAuth();
-  const [tab, setTab] = useState<Tab>('leaders');
+  const { isSuperAdmin, user } = usePlayerAuth();
+  const isEditor = user?.role === 'editor';
+  // Editors only post announcements and events; the other tabs are admin-only.
+  const visibleTabs = isEditor ? TABS.filter((t) => t.id === 'announcements' || t.id === 'events') : TABS;
+  // Anyone may edit content, but deletion is limited to the author (or a super
+  // admin), mirroring the ownership check on the server.
+  const canDelete = (createdBy?: string) => isSuperAdmin || (!!user && createdBy === user.id);
+  const [tab, setTab] = useState<Tab>(isEditor ? 'announcements' : 'leaders');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadPercent, setUploadPercent] = useState<number | null>(null);
@@ -389,7 +396,7 @@ export default function SiteContentPage() {
 
       {/* Tab bar */}
       <div className="flex flex-wrap gap-2 mb-6">
-        {TABS.map(({ id, label, icon: Icon }) => (
+        {visibleTabs.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => setTab(id)}
@@ -638,7 +645,7 @@ export default function SiteContentPage() {
                     <button aria-label={`Edit ${announcement.title}`} title="Edit"
                       onClick={() => { setAnnForm({ title: announcement.title, body: announcement.body ?? '', pinned: announcement.pinned === 1 }); setEditingAnn(announcement); setShowAnnForm(true); }}
                       className="p-1.5 dark:text-dark-300 text-dark-500 hover:text-primary-400"><Pencil size={15} /></button>
-                    {isSuperAdmin && (
+                    {canDelete(announcement.created_by) && (
                       <button aria-label={`Delete ${announcement.title}`} title="Delete" onClick={() => deleteAnnouncement(announcement)}
                         className="p-1.5 dark:text-dark-300 text-dark-500 hover:text-red-400"><Trash2 size={15} /></button>
                     )}
@@ -678,6 +685,9 @@ export default function SiteContentPage() {
       ) : tab === 'radio' ? (
         /* ---------------- Radio Schedule ---------------- */
         <RadioScheduleTab isSuperAdmin={isSuperAdmin} />
+      ) : tab === 'shortwave' ? (
+        /* ---------------- Shortwave Schedule ---------------- */
+        <ShortwaveTab isSuperAdmin={isSuperAdmin} />
       ) : (
         /* ---------------- Events ---------------- */
         <section>
@@ -718,7 +728,7 @@ export default function SiteContentPage() {
                         setShowEventForm(true);
                       }}
                       className="p-1.5 dark:text-dark-300 text-dark-500 hover:text-primary-400"><Pencil size={15} /></button>
-                    {isSuperAdmin && (
+                    {canDelete(event.created_by) && (
                       <button aria-label={`Delete ${event.title}`} title="Delete" onClick={() => deleteEvent(event)}
                         className="p-1.5 dark:text-dark-300 text-dark-500 hover:text-red-400"><Trash2 size={15} /></button>
                     )}
@@ -821,7 +831,7 @@ function RadioScheduleTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
       });
       await loadSlots();
       setEditing(null);
-      setDrafts((prev) => { const { [hour]: _drop, ...rest } = prev; return rest; });
+      setDrafts((prev) => { const next = { ...prev }; delete next[hour]; return next; });
       setSavingHour(null);
     } catch (err: unknown) {
       setSavingHour(null);
@@ -925,6 +935,202 @@ function RadioScheduleTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
           );
         })}
       </div>
+    </section>
+  );
+}
+
+/**
+ * Shortwave broadcast editor: independent transmission rows (time, frequency,
+ * language/region, program), each saved as its own record — unlike the radio
+ * grid, which is keyed by (day, hour). Table rows edit inline; the trash icon
+ * needs super admin, matching the radio schedule.
+ */
+type ShortwaveDraft = {
+  start_time: string;
+  end_time: string;
+  frequency_khz: number;
+  language: string;
+  target: string;
+  program: string;
+  active: number;
+  sort_order: number;
+};
+
+const SW_EMPTY: ShortwaveDraft = {
+  start_time: '06:00',
+  end_time: '',
+  frequency_khz: 15600,
+  language: '',
+  target: '',
+  program: '',
+  active: 1,
+  sort_order: 0,
+};
+
+function ShortwaveTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
+  const [entries, setEntries] = useState<ShortwaveEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null); // 'new' for the add-row
+  const [draft, setDraft] = useState<ShortwaveDraft>(SW_EMPTY);
+
+  useEffect(() => {
+    let mounted = true;
+    api.getShortwaveSchedule().then(
+      (rows) => { if (mounted) setEntries(rows); },
+      (err: unknown) => { if (mounted) toast.error(errorMessage(err, 'Failed to load shortwave schedule')); }
+    ).finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
+  }, []);
+
+  const loadEntries = async () => setEntries(await api.getShortwaveSchedule());
+
+  const openEdit = (entry: ShortwaveEntry) => {
+    setEditingId(entry.id);
+    setDraft({
+      start_time: entry.start_time.slice(0, 5),
+      end_time: entry.end_time ? entry.end_time.slice(0, 5) : '',
+      frequency_khz: entry.frequency_khz,
+      language: entry.language ?? '',
+      target: entry.target ?? '',
+      program: entry.program ?? '',
+      active: entry.active,
+      sort_order: entry.sort_order,
+    });
+  };
+
+  const save = async () => {
+    if (!draft.start_time.trim()) { toast.error('A start time is required'); return; }
+    if (!draft.frequency_khz || draft.frequency_khz < 100 || draft.frequency_khz > 30000) {
+      toast.error('Frequency must be between 100 and 30000 kHz'); return;
+    }
+    setSavingId(editingId ?? 'new');
+    try {
+      const payload: Omit<ShortwaveEntry, 'id'> = {
+        ...draft,
+        language: draft.language.trim() || null,
+        target: draft.target.trim() || null,
+        program: draft.program.trim() || null,
+      };
+      if (editingId === 'new') {
+        await api.createShortwaveEntry(payload);
+      } else if (editingId) {
+        await api.updateShortwaveEntry(editingId, payload);
+      }
+      await loadEntries();
+      setEditingId(null);
+      toast.success('Shortwave entry saved');
+    } catch (err: unknown) {
+      toast.error(errorMessage(err, 'Failed to save entry'));
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const remove = async (entry: ShortwaveEntry) => {
+    try {
+      await api.deleteShortwaveEntry(entry.id);
+      await loadEntries();
+      toast.success('Entry deleted');
+    } catch (err: unknown) {
+      toast.error(errorMessage(err, 'Failed to delete entry'));
+    }
+  };
+
+  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 size={32} className="animate-spin text-primary-400" /></div>;
+
+  const rowFields = (entry: ShortwaveDraft) => (
+    <>
+      <input type="time" value={entry.start_time} aria-label="Start time"
+        onChange={(e) => setDraft({ ...draft, start_time: e.target.value })} className={`${inputClass} w-32`} />
+      <input type="time" value={entry.end_time} aria-label="End time"
+        onChange={(e) => setDraft({ ...draft, end_time: e.target.value })} className={`${inputClass} w-32`} />
+      <input type="number" min={100} max={30000} value={entry.frequency_khz} aria-label="Frequency in kHz"
+        onChange={(e) => setDraft({ ...draft, frequency_khz: Number(e.target.value) })} className={`${inputClass} w-28`} />
+      <input type="text" value={entry.language} placeholder="Language" aria-label="Language"
+        onChange={(e) => setDraft({ ...draft, language: e.target.value })} className={`${inputClass} w-36`} />
+      <input type="text" value={entry.target} placeholder="Target region" aria-label="Target region"
+        onChange={(e) => setDraft({ ...draft, target: e.target.value })} className={`${inputClass} w-36`} />
+      <input type="text" value={entry.program} placeholder="Program" aria-label="Program"
+        onChange={(e) => setDraft({ ...draft, program: e.target.value })} className={`${inputClass} w-44`} />
+      <label className="flex items-center gap-1.5 text-xs dark:text-dark-200 text-dark-600">
+        <input type="checkbox" checked={entry.active === 1} onChange={(e) => setDraft({ ...draft, active: e.target.checked ? 1 : 0 })} />
+        Active
+      </label>
+    </>
+  );
+
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm dark:text-dark-300 text-dark-500">
+          Daily shortwave transmissions shown on the homepage. Time is local broadcast time; frequency is in kHz (100–30000).
+        </p>
+        <button onClick={() => { setEditingId('new'); setDraft(SW_EMPTY); }} className={primaryButton}>
+          <Plus size={16} /> New Broadcast
+        </button>
+      </div>
+
+      {editingId === 'new' && (
+        <div className="glass-panel rounded-xl p-4 mb-4 flex flex-wrap items-center gap-2">
+          {rowFields(draft)}
+          <div className="flex gap-1">
+            <button onClick={save} disabled={savingId === 'new'} title="Save"
+              className="flex items-center gap-1 px-3 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-xs font-medium rounded-lg transition-all">
+              {savingId === 'new' ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Save
+            </button>
+            <button onClick={() => setEditingId(null)} title="Cancel"
+              className="p-2 dark:bg-dark-500 bg-light-300 dark:text-dark-200 text-dark-600 rounded-lg"><X size={14} /></button>
+          </div>
+        </div>
+      )}
+
+      {entries.length === 0 ? (
+        <div className="text-center py-20 glass-panel rounded-xl">
+          <Signal size={48} className="dark:text-dark-400 text-dark-500 mx-auto mb-3" />
+          <p className="dark:text-dark-200 text-dark-600">No shortwave broadcasts yet. Add the first one!</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {entries.map((entry) => editingId === entry.id ? (
+            <div key={entry.id} className="glass-panel rounded-xl p-4 flex flex-wrap items-center gap-2">
+              {rowFields(draft)}
+              <div className="flex gap-1">
+                <button onClick={save} disabled={savingId === entry.id} title="Save"
+                  className="flex items-center gap-1 px-3 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-xs font-medium rounded-lg transition-all">
+                  {savingId === entry.id ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Save
+                </button>
+                <button onClick={() => setEditingId(null)} title="Cancel"
+                  className="p-2 dark:bg-dark-500 bg-light-300 dark:text-dark-200 text-dark-600 rounded-lg"><X size={14} /></button>
+              </div>
+            </div>
+          ) : (
+            <div key={entry.id} className="glass-panel rounded-xl p-4 flex flex-wrap items-center gap-x-4 gap-y-1">
+              <span className="text-sm font-semibold tabular-nums dark:text-white text-dark-900 w-32">
+                {entry.start_time.slice(0, 5)}{entry.end_time ? ` – ${entry.end_time.slice(0, 5)}` : ''}
+              </span>
+              <span className="text-sm tabular-nums dark:text-dark-100 text-dark-700 w-28">
+                {(entry.frequency_khz / 1000).toFixed(1).replace(/\.0$/, '')} MHz
+                <span className="dark:text-dark-400 text-dark-500"> · {entry.frequency_khz.toLocaleString()} kHz</span>
+              </span>
+              <span className="text-sm dark:text-dark-200 text-dark-600">{entry.language ?? ''}</span>
+              <span className="text-sm dark:text-dark-300 text-dark-500">{entry.target ?? ''}</span>
+              <span className="text-sm font-medium dark:text-white text-dark-900 flex-1 min-w-[10rem] truncate">{entry.program ?? ''}</span>
+              {!isSuperAdmin || entry.active !== 0 ? null : (
+                <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-muted dark:bg-dark-500 dark:text-dark-300 text-muted-foreground">hidden</span>
+              )}
+              <div className="flex gap-1 shrink-0">
+                <button title={`Edit ${entry.program || 'broadcast'}`} onClick={() => openEdit(entry)}
+                  className="p-1 dark:text-dark-300 text-dark-500 hover:text-primary-400"><Pencil size={13} /></button>
+                {isSuperAdmin && (
+                  <button title="Delete entry" onClick={() => remove(entry)}
+                    className="p-1 dark:text-dark-300 text-dark-500 hover:text-red-400"><Trash2 size={13} /></button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   );
 }

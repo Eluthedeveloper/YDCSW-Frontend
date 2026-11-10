@@ -10,6 +10,7 @@ import filmImg from "../assets/film.jpg";
 import radioImg from "../assets/radio.jpg";
 import { SiteShell } from "../components/site/SiteShell";
 import { RadioSchedule } from "../components/RadioSchedule";
+import { ShortwaveSchedule } from "../components/ShortwaveSchedule";
 import { useAsyncData } from "../player/hooks/useAsyncData";
 import { api, uploadUrl } from "../player/utils/api";
 import type { Announcement, SiteEvent, BlogPost } from "../player/utils/types";
@@ -154,19 +155,9 @@ function ProgramsCTA() {
 
 function RadioHighlight() {
   const { t } = useTranslation();
-  const [iframeVisible, setIframeVisible] = useState(false);
 
-  const openPopup = () => {
-    const w = 320;
-    const h = 502;
-    const l = (screen.width - w) / 2;
-    const t = (screen.height - h) / 2;
-    window.open(
-      'https://embed.clrd.net/player/01a0b3b8-5bce-72ff-a90a-59d2d5011c0c?bg=filled',
-      'radio_player',
-      `width=${w},height=${h},left=${l},top=${t},scrollbars=no,resizable=yes,noopener,noreferrer`
-    );
-  };
+  const scrollToSchedule = () =>
+    document.getElementById("schedule")?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   return (
     <section className="bg-primary py-24 lg:py-32">
@@ -176,8 +167,10 @@ function RadioHighlight() {
             <img src={radioImg} alt="" className="h-full w-full object-cover" loading="lazy" />
             <div className="absolute inset-0 bg-gradient-to-t from-primary/80 to-transparent" />
             <div className="absolute bottom-6 left-6 flex items-center gap-3">
-              <span className="flex h-3 w-3 rounded-full bg-red-500 animate-pulse" />
-              <span className="text-xs font-semibold uppercase tracking-widest text-background">Live Now</span>
+              <span className="flex h-3 w-3 rounded-full bg-gold animate-pulse" />
+              <span className="text-xs font-semibold uppercase tracking-widest text-background">
+                {t("home.radio.comingSoon")}
+              </span>
             </div>
           </div>
           <div>
@@ -188,11 +181,20 @@ function RadioHighlight() {
             <p className="mt-6 max-w-lg leading-relaxed text-background/75">{t("home.radio.desc")}</p>
 
             <div className="mt-10 flex flex-wrap gap-4">
-              <button onClick={() => setIframeVisible((prev) => !prev)} className="inline-flex items-center gap-3 rounded-full bg-gold px-7 py-4 text-sm font-semibold text-gold-foreground shadow-[var(--shadow-gold)] transition hover:scale-105">
-                <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4"><path d="M8 5v14l11-7z" /></svg>
-                {iframeVisible ? t("home.radio.hide") : t("home.radio.listen")}
-              </button>
-              <button className="inline-flex items-center gap-2 rounded-full border border-background/30 px-7 py-4 text-sm font-semibold text-background transition hover:border-gold hover:text-gold">
+              <span
+                aria-disabled="true"
+                className="inline-flex cursor-not-allowed items-center gap-3 rounded-full border border-gold/40 bg-gold/10 px-7 py-4 text-sm font-semibold text-gold"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 7v5l3 3" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                {t("home.radio.comingSoon")}
+              </span>
+              <button
+                onClick={scrollToSchedule}
+                className="inline-flex items-center gap-2 rounded-full border border-background/30 px-7 py-4 text-sm font-semibold text-background transition hover:border-gold hover:text-gold"
+              >
                 {t("home.radio.schedule")}
               </button>
             </div>
@@ -202,26 +204,12 @@ function RadioHighlight() {
                 [t("home.radio.scheduleBlocks.worship"), t("home.radio.scheduleBlocks.worshipTime")],
                 [t("home.radio.scheduleBlocks.teaching"), t("home.radio.scheduleBlocks.teachingTime")],
                 [t("home.radio.scheduleBlocks.testimonies"), t("home.radio.scheduleBlocks.testimoniesTime")],
-              ].map(([t, time]) => (
-                <div key={t}>
-                  <div className="font-serif text-lg text-gold">{t}</div>
+              ].map(([label, time]) => (
+                <div key={label}>
+                  <div className="font-serif text-lg text-gold">{label}</div>
                   <div className="mt-1 text-xs text-background/60">{time}</div>
                 </div>
               ))}
-            </div>
-
-            <div className="mt-10 border-t border-background/15 pt-8">
-              {iframeVisible && (
-                <div className="flex justify-center">
-                  <iframe src="https://embed.clrd.net/player/01a0b3b8-5bce-72ff-a90a-59d2d5011c0c" width="320" height="502" frameBorder="0" allow="autoplay; encrypted-media" title="Radio Player" className="rounded-xl shadow-lg" />
-                </div>
-              )}
-              <div className="mt-4 text-center">
-                <button onClick={openPopup} className="inline-flex items-center gap-2 rounded-full border border-background/30 px-7 py-4 text-sm font-semibold text-background transition hover:border-gold hover:text-gold">
-                  <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4"><path d="M8 5v14l11-7z" /></svg>
-                  {t("home.radio.popup")}
-                </button>
-              </div>
             </div>
           </div>
         </div>
@@ -471,6 +459,7 @@ export function HomePage(): React.ReactElement {
         <ProgramsCTA />
         <Ministries />
         <RadioSchedule />
+        <ShortwaveSchedule />
         <CTA />
       </SiteShell>
     </>

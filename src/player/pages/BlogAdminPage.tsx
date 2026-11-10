@@ -47,7 +47,9 @@ const submitButton =
 const EMPTY_FORM = { title: '', category: '', excerpt: '', body: '', published: true };
 
 export default function BlogAdminPage() {
-  const { isSuperAdmin } = usePlayerAuth();
+  const { isSuperAdmin, user } = usePlayerAuth();
+  // Deletion is limited to the author (or a super admin), matching the API.
+  const canDelete = (createdBy?: string) => isSuperAdmin || (!!user && createdBy === user.id);
   const { data: posts, loading, error, reload } = useAsyncData<BlogPost[]>(
     () => api.getAdminBlogPosts(),
     []
@@ -213,7 +215,7 @@ export default function BlogAdminPage() {
                   <div className="flex items-center gap-1 shrink-0">
                     <button aria-label={`Edit ${post.title}`} title="Edit" onClick={() => openEdit(post)}
                       className="p-1.5 dark:text-dark-300 text-dark-500 hover:text-primary-400"><Pencil size={15} /></button>
-                    {isSuperAdmin && (
+                    {canDelete(post.created_by) && (
                       <button aria-label={`Delete ${post.title}`} title="Delete" onClick={() => remove(post)}
                         className="p-1.5 dark:text-dark-300 text-dark-500 hover:text-red-400"><Trash2 size={15} /></button>
                     )}

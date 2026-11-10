@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { PlayerProvider, usePlayer } from './PlayerContext';
 import { api } from '../utils/api';
@@ -99,6 +99,11 @@ beforeEach(() => {
   });
   vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
   vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+});
+
+// Each case stubs `fetch` for the missing-file probe; drop it before the next.
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 function mount() {
@@ -434,5 +439,38 @@ describe('playback errors', () => {
     await userEvent.click(screen.getByText('dismissError'));
 
     expect(read('error')).toBe('none');
+  });
+
+  it('reports a missing audio file when the server answers 404', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ status: 404 }));
+    mount();
+    await userEvent.click(screen.getByText('playA'));
+
+    // MediaError code 4 is what both a 404 and an undecodable file produce.
+    Object.defineProperty(audioEl, 'error', {
+      configurable: true,
+      value: { code: 4 },
+    });
+    act(() => {
+      audioEl?.dispatchEvent(new Event('error'));
+    });
+
+    await waitFor(() => expect(read('error')).toBe('notfound'));
+  });
+
+  it('keeps "unsupported" when the file exists but cannot be decoded', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ status: 200 }));
+    mount();
+    await userEvent.click(screen.getByText('playA'));
+
+    Object.defineProperty(audioEl, 'error', {
+      configurable: true,
+      value: { code: 4 },
+    });
+    act(() => {
+      audioEl?.dispatchEvent(new Event('error'));
+    });
+
+    await waitFor(() => expect(read('error')).toBe('unsupported'));
   });
 });

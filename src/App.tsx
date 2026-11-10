@@ -67,6 +67,9 @@ function RouteFallback() {
 // navigating straight to a page that would only ever render 403s.
 const SUPER_ADMIN_PAGES: readonly string[] = ['users'];
 
+// Editors may only publish announcements, events and blog posts.
+const EDITOR_PAGES: readonly string[] = ['site', 'blog'];
+
 // Built as elements rather than components so each one is only instantiated
 // when its route actually matches.
 const ADMIN_PAGES: Record<string, React.ReactNode> = {
@@ -100,12 +103,18 @@ function PlayerAdminSite() {
 
   if (!user) return <PlayerLoginPage />;
 
-  // Unknown segments fall back to programs rather than a blank screen. An
-  // empty segment is the bare /admin/player, handled by a redirect below.
-  const activePage = page && page in ADMIN_PAGES ? page : 'programs';
+  // Unknown segments fall back to the role's home rather than a blank screen.
+  // An empty segment is the bare /admin/player, handled by a redirect below.
+  const isEditor = user.role === 'editor';
+  const homePage = isEditor ? 'site' : 'programs';
+  const activePage = page && page in ADMIN_PAGES ? page : homePage;
+
+  if (isEditor && !EDITOR_PAGES.includes(activePage)) {
+    return <Navigate to="/admin/player/site" replace />;
+  }
 
   if (SUPER_ADMIN_PAGES.includes(activePage) && !isSuperAdmin) {
-    return <Navigate to="/admin/player/programs" replace />;
+    return <Navigate to={`/admin/player/${homePage}`} replace />;
   }
 
   return (

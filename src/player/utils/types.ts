@@ -2,7 +2,7 @@ export interface AuthUser {
   id: string;
   username: string;
   email: string;
-  role: 'super_admin' | 'admin';
+  role: 'super_admin' | 'admin' | 'editor';
 }
 
 export interface UserRow extends AuthUser {
@@ -117,6 +117,8 @@ export interface Announcement {
   title: string;
   body?: string | null;
   pinned: number;
+  /** User id of the author; only they (or a super admin) may delete it. */
+  created_by?: string;
   created_at?: string;
 }
 
@@ -127,6 +129,8 @@ export interface SiteEvent {
   location?: string | null;
   starts_at: string;
   ends_at?: string | null;
+  /** User id of the author; only they (or a super admin) may delete it. */
+  created_by?: string;
   created_at?: string;
 }
 
@@ -140,6 +144,19 @@ export interface RadioSlot {
   category: 'worship' | 'teaching' | 'talk' | 'music' | 'live';
 }
 
+/** One transmission of the shortwave schedule; independent rows, not slots. */
+export interface ShortwaveEntry {
+  id: string;
+  start_time: string;
+  end_time?: string | null;
+  frequency_khz: number;
+  language?: string | null;
+  target?: string | null;
+  program?: string | null;
+  active: number;
+  sort_order: number;
+}
+
 export interface BlogPost {
   id: string;
   slug: string;
@@ -151,6 +168,8 @@ export interface BlogPost {
   /** Extra photos shown inside the article, filenames under uploads/blogs. */
   images?: string[];
   published: number;
+  /** User id of the author; only they (or a super admin) may delete it. */
+  created_by?: string;
   created_at?: string;
   updated_at?: string;
 }
