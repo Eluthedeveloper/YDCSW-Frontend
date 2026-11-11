@@ -328,8 +328,8 @@ export const programsOm: typeof programsEn = {
     brand: "Sagalee Misiraachoo",
   },
   audioPlayer: {
-    playingFrom: "Irraa taphachaa jira",
-    program: "Piroogiraama",
+    playingFrom: "taphachaa jira",
+    program: "Sagantaa",
     unknownArtist: "Artistii Hin Beekamne",
   },
   playbackError: {
