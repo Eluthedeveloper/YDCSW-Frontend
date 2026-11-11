@@ -29,6 +29,7 @@ const en = {
     bookshops: "Visit a Bookshop Near You",
     openMenu: "Open menu",
     closeMenu: "Close menu",
+    more: "More",
   },
   bookshops: {
     metaTitle: "Visit a Bookshop Near You | Yemisrach Dimts",
@@ -617,6 +618,17 @@ const en = {
     rights: "© 2025 Yemisrach Dimts Communication Services. All rights reserved.",
     rightsAmharic: "© 2025 የምሥራች ድምፅ አገልግሎት. ሁሉም መብቶች የተጠበቁ ናቸው።",
     rightsOromo: "© 2025 Sagalee Misiraachoo Dhimmaa. Mirgaan hundi eegameera.",
+    org: "EECMY – Yemisrach Dimts Communication Service",
+    tagline: "Broadcasting the Gospel to Ethiopia and beyond.",
+    explore: "Explore",
+    ministries: "Ministries",
+    radioBroadcasting: "Radio Broadcasting",
+    internetRadio: "Internet Radio",
+    filmVideo: "Film & Video",
+    podcast: "Podcast",
+    devotionals: "Devotionals",
+    contact: "Contact",
+    copyright: "© {{year}} Yemisrach Dimts Communication Service (EECMY‑YDCS). All rights reserved.",
   },
 };
 

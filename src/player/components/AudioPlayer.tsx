@@ -41,7 +41,9 @@ function DraggableProgress({
   // would never re-render when the flag flipped.
   const [dragPercent, setDragPercent] = useState<number | null>(null);
   const isDragging = dragPercent !== null;
-  const rafRef = useRef<number>(0);
+  // The audio element is only seeked once, on release. Seeking on every move
+  // frame makes the browser drop and re-fetch its buffer per frame, which
+  // stutters playback and hammers the server with range requests.
   const pendingSeekRef = useRef<number>(0);
   // Mirrors of values the stable listeners below need. Written in an effect so
   // no ref is mutated during render.
@@ -65,32 +67,19 @@ function DraggableProgress({
     const pct = getPercent(clientX);
     setDragPercent(pct * 100);
     pendingSeekRef.current = pct * duration;
-    onSeek(pct * duration);
     document.body.style.userSelect = 'none';
-  }, [getPercent, duration, onSeek, onSeekStart]);
+  }, [getPercent, duration, onSeekStart]);
 
   const handleMove = useCallback((clientX: number) => {
     if (!dragging.current) return;
     const pct = getPercent(clientX);
     setDragPercent(pct * 100);
     pendingSeekRef.current = pct * durationRef.current;
-    if (!rafRef.current) {
-      rafRef.current = requestAnimationFrame(() => {
-        rafRef.current = 0;
-        if (dragging.current) {
-          onSeekRef.current(pendingSeekRef.current);
-        }
-      });
-    }
   }, [getPercent]);
 
   const handleUp = useCallback(() => {
     if (!dragging.current) return;
     dragging.current = false;
-    if (rafRef.current) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = 0;
-    }
     onSeekRef.current(pendingSeekRef.current);
     setDragPercent(null);
     onSeekEnd();
@@ -112,7 +101,6 @@ function DraggableProgress({
       window.removeEventListener('mouseup', onMouseUp);
       window.removeEventListener('touchmove', onTouchMove);
       window.removeEventListener('touchend', onTouchEnd);
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
   }, [handleMove, handleUp]);
 

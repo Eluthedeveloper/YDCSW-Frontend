@@ -85,10 +85,10 @@ export function Footer(): React.ReactElement {
             <span className="font-serif text-xl text-foreground">Yemisrach Dimts</span>
           </div>
           <p className="mt-2 text-sm font-medium text-muted-foreground">
-            EECMY – Yemisrach Dimts Communication Service
+            {t("footer.org")}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Broadcasting the Gospel to Ethiopia and beyond.
+            {t("footer.tagline")}
           </p>
           <div className="mt-5 flex items-center gap-3">
             {SOCIAL_LINKS.map((social) => (
@@ -107,7 +107,7 @@ export function Footer(): React.ReactElement {
           </div>
         </div>
         <div>
-          <h4 className="font-serif text-sm uppercase tracking-widest text-foreground">Explore</h4>
+          <h4 className="font-serif text-sm uppercase tracking-widest text-foreground">{t("footer.explore")}</h4>
           <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
             <li><Link to="/" className="transition hover:text-gold">{t("nav.home")}</Link></li>
             <li><Link to="/about" className="transition hover:text-gold">{t("nav.about")}</Link></li>
@@ -119,17 +119,17 @@ export function Footer(): React.ReactElement {
           </ul>
         </div>
         <div>
-          <h4 className="font-serif text-sm uppercase tracking-widest text-foreground">Ministries</h4>
+          <h4 className="font-serif text-sm uppercase tracking-widest text-foreground">{t("footer.ministries")}</h4>
           <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
-            <li>Radio Broadcasting</li>
-            <li>Internet Radio</li>
-            <li>Film & Video</li>
-            <li>Podcast</li>
-            <li>Devotionals</li>
+            <li>{t("footer.radioBroadcasting")}</li>
+            <li>{t("footer.internetRadio")}</li>
+            <li>{t("footer.filmVideo")}</li>
+            <li>{t("footer.podcast")}</li>
+            <li>{t("footer.devotionals")}</li>
           </ul>
         </div>
         <div>
-          <h4 className="font-serif text-sm uppercase tracking-widest text-foreground">Contact</h4>
+          <h4 className="font-serif text-sm uppercase tracking-widest text-foreground">{t("footer.contact")}</h4>
           <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
             <li>{site.organisation}</li>
             <li>{site.address}</li>
@@ -143,7 +143,7 @@ export function Footer(): React.ReactElement {
         </div>
       </div>
       <div className="mx-auto mt-12 max-w-7xl border-t border-border px-6 pt-6 text-xs text-muted-foreground lg:px-12">
-        © {new Date().getFullYear()} {site.organisation} (EECMY‑YDCS). All rights reserved.
+        {t("footer.copyright", { year: new Date().getFullYear() })}
       </div>
     </footer>
   );

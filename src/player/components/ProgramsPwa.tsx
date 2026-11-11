@@ -23,7 +23,7 @@ const HEAD_ELEMENTS: HeadElement[] = [
   // iOS reads these instead of (or in addition to) the web manifest.
   { tag: 'link', attrs: { rel: 'apple-touch-icon', href: '/logo.png' } },
   { tag: 'meta', attrs: { name: 'apple-mobile-web-app-capable', content: 'yes' } },
-  { tag: 'meta', attrs: { name: 'apple-mobile-web-app-title', content: 'Program Library' } },
+  { tag: 'meta', attrs: { name: 'apple-mobile-web-app-title', content: 'YDCS Stream' } },
   { tag: 'meta', attrs: { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' } },
 ];
 

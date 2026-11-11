@@ -9,9 +9,13 @@ export function Nav(): React.ReactElement {
   const { t, i18n } = useTranslation();
   const { pathname } = useLocation();
   const isHome = pathname === "/";
+  // The Oromo "Nu Waliin Hojjedhaa" CTA is long enough to crowd the desktop
+  // bar, so the gold partner button only renders for en/am.
+  const isOromo = (i18n.resolvedLanguage ?? i18n.language ?? "").startsWith("om");
   const [scrolled, setScrolled] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [deptOpen, setDeptOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileAboutOpen, setMobileAboutOpen] = useState(false);
   const [mobileDeptOpen, setMobileDeptOpen] = useState(false);
@@ -29,6 +33,7 @@ export function Nav(): React.ReactElement {
       const target = e.target as HTMLElement;
       if (!target.closest("[data-about-dropdown]")) setAboutOpen(false);
       if (!target.closest("[data-dept-dropdown]")) setDeptOpen(false);
+      if (!target.closest("[data-more-dropdown]")) setMoreOpen(false);
     };
     // Escape closes an open dropdown. It only had an outside-click handler, so a
     // keyboard user who opened one with Enter had no way to dismiss it without
@@ -37,18 +42,19 @@ export function Nav(): React.ReactElement {
       if (e.key !== "Escape") return;
       setAboutOpen(false);
       setDeptOpen(false);
+      setMoreOpen(false);
       setMobileAboutOpen(false);
       setMobileDeptOpen(false);
     };
-    if (aboutOpen || deptOpen) document.addEventListener("click", onClick);
-    if (aboutOpen || deptOpen || mobileAboutOpen || mobileDeptOpen) {
+    if (aboutOpen || deptOpen || moreOpen) document.addEventListener("click", onClick);
+    if (aboutOpen || deptOpen || moreOpen || mobileAboutOpen || mobileDeptOpen) {
       document.addEventListener("keydown", onKeyDown);
     }
     return () => {
       document.removeEventListener("click", onClick);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [aboutOpen, deptOpen, mobileAboutOpen, mobileDeptOpen]);
+  }, [aboutOpen, deptOpen, moreOpen, mobileAboutOpen, mobileDeptOpen]);
 
   // Lock body scroll when mobile menu is open
   useEffect(() => {
@@ -158,12 +164,17 @@ export function Nav(): React.ReactElement {
 
   // Shared visual treatments. Keeping them here rather than repeating a long
   // class string on every link makes the active/hover states stay in sync.
+  // `min-w-0` on the links plus a truncating inner span lets the row shrink
+  // gracefully: long locale labels (e.g. Oromo) ellipsize instead of
+  // overflowing the nav list and overlapping the partner/language controls.
+  // The li must itself be a flex container — an inline-flex child of a block
+  // li always sizes to its content and overflows, so truncation never engaged.
   const desktopLink = ({ isActive }: { isActive: boolean }) =>
-    `relative inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-2 transition-colors duration-200 after:absolute after:inset-x-2.5 after:-bottom-0.5 after:h-px after:origin-left after:scale-x-0 after:bg-gold after:transition-transform after:duration-300 after:content-[''] hover:text-gold hover:after:scale-x-100 ${
+    `relative flex min-w-0 items-center whitespace-nowrap rounded-full px-2.5 py-2 transition-colors duration-200 after:absolute after:inset-x-2.5 after:-bottom-0.5 after:h-px after:origin-left after:scale-x-0 after:bg-gold after:transition-transform after:duration-300 after:content-[''] hover:text-gold hover:after:scale-x-100 ${
       isActive ? "text-gold after:scale-x-100" : "text-background/80"
     }`;
   const desktopTrigger = (active: boolean) =>
-    `flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-2 transition-colors duration-200 hover:text-gold ${
+    `flex min-w-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-2 transition-colors duration-200 hover:text-gold ${
       active ? "text-gold" : "text-background/80"
     }`;
   const dropdownItem =
@@ -241,13 +252,13 @@ export function Nav(): React.ReactElement {
         </Link>
 
         {/* Desktop navigation */}
-        <ul className="no-scrollbar hidden min-w-0 flex-1 items-center justify-start gap-0 overflow-x-auto text-[13px] font-medium lg:flex">
-          <li>
+        <ul className="hidden min-w-0 flex-1 items-center justify-start gap-0 text-[13px] font-medium lg:flex">
+          <li className="flex min-w-0">
             <NavLink to="/" end className={desktopLink}>
-              {t("nav.home")}
+              <span className="truncate">{t("nav.home")}</span>
             </NavLink>
           </li>
-          <li className="relative" data-about-dropdown>
+          <li className="relative flex min-w-0" data-about-dropdown>
             <button
               onClick={() => setAboutOpen((p) => !p)}
               aria-expanded={aboutOpen}
@@ -256,11 +267,11 @@ export function Nav(): React.ReactElement {
                 pathname === "/about" || pathname === "/leadership" || aboutOpen
               )}
             >
-              {t("nav.about")}
+              <span className="truncate">{t("nav.about")}</span>
               <svg
                 viewBox="0 0 24 24"
                 fill="none"
-                className={`h-3 w-3 transition-transform duration-200 ${aboutOpen ? "rotate-180" : ""}`}
+                className={`h-3 w-3 shrink-0 transition-transform duration-200 ${aboutOpen ? "rotate-180" : ""}`}
                 stroke="currentColor"
                 strokeWidth="2.5"
               >
@@ -289,33 +300,35 @@ export function Nav(): React.ReactElement {
               </div>
             )}
           </li>
-          <li>
+          {/* Services/Programs/Blog/Gallery are collapsed into "More" below xl,
+              where long locale labels would otherwise overflow the bar. */}
+          <li className="hidden min-w-0 xl:flex">
             <NavLink to="/services" className={desktopLink}>
-              {t("nav.services")}
+              <span className="truncate">{t("nav.services")}</span>
             </NavLink>
           </li>
-          <li>
+          <li className="hidden min-w-0 xl:flex">
             <NavLink to="/programs" className={desktopLink}>
-              {t("nav.programs")}
+              <span className="truncate">{t("nav.programs")}</span>
             </NavLink>
           </li>
-          <li>
+          <li className="hidden min-w-0 xl:flex">
             <NavLink to="/blog" className={desktopLink}>
-              {t("nav.blog")}
+              <span className="truncate">{t("nav.blog")}</span>
             </NavLink>
           </li>
-          <li className="relative" data-dept-dropdown>
+          <li className="relative flex min-w-0" data-dept-dropdown>
             <button
               onClick={() => setDeptOpen((p) => !p)}
               aria-expanded={deptOpen}
               aria-haspopup="true"
               className={desktopTrigger(pathname.startsWith("/divisions") || deptOpen)}
             >
-              {t("nav.divisions")}
+              <span className="truncate">{t("nav.divisions")}</span>
               <svg
                 viewBox="0 0 24 24"
                 fill="none"
-                className={`h-3 w-3 transition-transform duration-200 ${deptOpen ? "rotate-180" : ""}`}
+                className={`h-3 w-3 shrink-0 transition-transform duration-200 ${deptOpen ? "rotate-180" : ""}`}
                 stroke="currentColor"
                 strokeWidth="2.5"
               >
@@ -337,36 +350,87 @@ export function Nav(): React.ReactElement {
               </div>
             )}
           </li>
-          <li>
-            <NavLink to="/gallery" className={desktopLink}>
-              {t("nav.gallery")}
-            </NavLink>
+          <li className="relative flex min-w-0 xl:hidden" data-more-dropdown>
+            <button
+              onClick={() => setMoreOpen((p) => !p)}
+              aria-expanded={moreOpen}
+              aria-haspopup="true"
+              className={desktopTrigger(
+                ["/services", "/programs", "/blog", "/gallery"].some((p) => pathname.startsWith(p)) ||
+                moreOpen
+              )}
+            >
+              <span className="truncate">{t("nav.more")}</span>
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                className={`h-3 w-3 shrink-0 transition-transform duration-200 ${moreOpen ? "rotate-180" : ""}`}
+                stroke="currentColor"
+                strokeWidth="2.5"
+              >
+                <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            {moreOpen && (
+              <div className="absolute top-full left-0 mt-3 w-60 origin-top-left overflow-hidden rounded-2xl border border-white/10 bg-primary/95 p-2 shadow-[var(--shadow-elegant)] ring-1 ring-gold/10 backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-150">
+                {[
+                  { to: "/services", label: t("nav.services") },
+                  { to: "/programs", label: t("nav.programs") },
+                  { to: "/blog", label: t("nav.blog") },
+                  // Gallery sits in the bar itself for en/am, so only Oromo —
+                  // whose labels need the room — keeps it collapsed here.
+                  ...(!isOromo ? [] : [{ to: "/gallery", label: t("nav.gallery") }]),
+                ].map((item) => (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    onClick={() => setMoreOpen(false)}
+                    className={dropdownItem}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
+            )}
           </li>
-          <li>
+          {/* Gallery is a visible bar item for en/am; Oromo keeps it in More. */}
+          {!isOromo && (
+            <li className="flex min-w-0">
+              <NavLink to="/gallery" className={desktopLink}>
+                <span className="truncate">{t("nav.gallery")}</span>
+              </NavLink>
+            </li>
+          )}
+          <li className="flex min-w-0">
             <NavLink to="/contact" className={desktopLink}>
-              {t("nav.contact")}
+              <span className="truncate">{t("nav.contact")}</span>
             </NavLink>
           </li>
+          {/* Partner CTA sits after Contact, at the far right end of the links;
+              its long Oromo label crowds the bar, so it only shows for en/am. */}
+          {!isOromo && (
+            <li className="shrink-0">
+              <Link
+                to="/contact"
+                className="group inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-[image:var(--gradient-gold)] px-5 py-2 text-xs font-semibold text-gold-foreground shadow-[var(--shadow-gold)] ring-1 ring-white/20 transition hover:brightness-105 hover:shadow-[0_14px_40px_-10px_oklch(0.72_0.13_75/0.75)]"
+              >
+                {t("nav.partner")}
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                >
+                  <path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </Link>
+            </li>
+          )}
         </ul>
 
         <div className="flex shrink-0 items-center gap-2">
           <NotificationBell />
-
-          <Link
-            to="/contact"
-            className="group hidden shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-[image:var(--gradient-gold)] px-5 py-2 text-xs font-semibold text-gold-foreground shadow-[var(--shadow-gold)] ring-1 ring-white/20 transition hover:brightness-105 hover:shadow-[0_14px_40px_-10px_oklch(0.72_0.13_75/0.75)] xl:inline-flex"
-          >
-            {t("nav.partner")}
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5"
-              stroke="currentColor"
-              strokeWidth="2.5"
-            >
-              <path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </Link>
 
           {/* One compact select serves both desktop and the mobile bar. */}
           {languageSelect}
