@@ -40,6 +40,7 @@ const en = {
     metaDesc: "The voice of the Gospel in Ethiopia — radio, music, literature, and media for over six decades.",
     heroTitle: "O earth, earth, earth, hear the word of the LORD!",
     heroSub: "For over six decades, Yemisrach Dimts has carried the Gospel of Jesus Christ through radio, music, literature, and media — reaching millions across Ethiopia and beyond with the message of hope.",
+    heroListen: "Listen Our Programs",
     stats: {
       lives: "60M+ Lives reached",
       countries: ">15 Countries",

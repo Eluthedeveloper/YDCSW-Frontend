@@ -308,11 +308,6 @@ export function Nav(): React.ReactElement {
             </NavLink>
           </li>
           <li className="hidden min-w-0 xl:flex">
-            <NavLink to="/programs" className={desktopLink}>
-              <span className="truncate">{t("nav.programs")}</span>
-            </NavLink>
-          </li>
-          <li className="hidden min-w-0 xl:flex">
             <NavLink to="/blog" className={desktopLink}>
               <span className="truncate">{t("nav.blog")}</span>
             </NavLink>
@@ -356,7 +351,7 @@ export function Nav(): React.ReactElement {
               aria-expanded={moreOpen}
               aria-haspopup="true"
               className={desktopTrigger(
-                ["/services", "/programs", "/blog", "/gallery"].some((p) => pathname.startsWith(p)) ||
+                ["/services", "/blog", "/gallery"].some((p) => pathname.startsWith(p)) ||
                 moreOpen
               )}
             >
@@ -375,7 +370,6 @@ export function Nav(): React.ReactElement {
               <div className="absolute top-full left-0 mt-3 w-60 origin-top-left overflow-hidden rounded-2xl border border-white/10 bg-primary/95 p-2 shadow-[var(--shadow-elegant)] ring-1 ring-gold/10 backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-150">
                 {[
                   { to: "/services", label: t("nav.services") },
-                  { to: "/programs", label: t("nav.programs") },
                   { to: "/blog", label: t("nav.blog") },
                   // Gallery sits in the bar itself for en/am, so only Oromo —
                   // whose labels need the room — keeps it collapsed here.
@@ -562,14 +556,6 @@ export function Nav(): React.ReactElement {
                 className={mobileLink}
               >
                 {t("nav.services")}
-              </NavLink>
-
-              <NavLink
-                to="/programs"
-                onClick={closeMobile}
-                className={mobileLink}
-              >
-                {t("nav.programs")}
               </NavLink>
 
               <NavLink

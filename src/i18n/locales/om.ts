@@ -37,6 +37,7 @@ const om = {
     metaDesc: "Sagaleen Wangeelaa Itoophiyaa keessatti — raadiyoo, muuziqaa, barruu fi miidiyaa waggaa 60itti.",
     heroTitle: "Yaa lafaa, yaa lafaa, yaa lafaa, dubbii Waaqayyoo dhaga'i!",
     heroSub: "Waggoota 60 ol darbaniif, Sagaleen Wangeelaa karaa raadiyoo, muuziqaa, barruu fi miidiyaatiin Wangeela Yesuus Kiristoos labsaa tureera; Itoophiyaa keessatti fi daangaa ishee darbee, namoota miliyoonaan lakkaa’aman ergaa abdii qabuun ga’eera.",
+    heroListen: "Saganta keenya dhaggeeffadhaa",
     stats: {
       lives: "Lubbuu 60M+ bira geenyerra",
       countries: "Biyyoota >15",

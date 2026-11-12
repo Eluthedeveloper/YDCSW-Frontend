@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
 import { SiteShell } from "../components/site/SiteShell";
+import { streamUrl } from "../lib/hosts";
 
 /**
  * Catch-all route.
@@ -38,12 +39,12 @@ export function NotFoundPage(): React.ReactElement {
               >
                 {t("notFound.backHome")}
               </Link>
-              <Link
-                to="/programs"
+              <a
+                href={streamUrl()}
                 className="inline-flex items-center gap-2 text-sm text-background/80 underline underline-offset-4 transition hover:text-background"
               >
                 {t("nav.programs")}
-              </Link>
+              </a>
             </div>
           </div>
         </section>

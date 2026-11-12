@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { Suspense } from 'react';
 
 /**
  * Mounting the real route tree is the only reliable guard against the router
@@ -121,5 +123,40 @@ describe('App router wiring', () => {
     window.history.pushState({}, '', '/admin/player/blog');
     render(<App />);
     expect(await screen.findByRole('heading', { name: 'Blog' }, { timeout: 5_000 })).toBeTruthy();
+  });
+
+  // The stream subdomain renders its own route tree, whose root serves the
+  // player home directly at the bare URL. Mounted directly under MemoryRouter:
+  // the host branch in AppRoutes is a one-line check (unit-tested via
+  // lib/hosts), and jsdom makes stubbing window.location.hostname unreliable.
+  it('stream route tree serves the program library at the root', async () => {
+    const { StreamRoutes } = await import('./App');
+
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        {/* App wraps its route tree in Suspense; the lazy pages inside
+            StreamRoutes need the same boundary here. */}
+        <Suspense fallback={<span data-testid="route-loading" />}>
+          <StreamRoutes />
+        </Suspense>
+      </MemoryRouter>
+    );
+    // Translations are not initialised in tests, so i18next renders the raw
+    // key — a stable marker of the library home having loaded.
+    expect(await screen.findByText(/home\.welcome/)).toBeTruthy();
+  });
+
+  it('stream route tree keeps the catch-all for unknown paths', async () => {
+    const { StreamRoutes } = await import('./App');
+
+    render(
+      <MemoryRouter initialEntries={['/no-such-page']}>
+        <Suspense fallback={<span data-testid="route-loading" />}>
+          <StreamRoutes />
+        </Suspense>
+      </MemoryRouter>
+    );
+    // The 404 page renders a literal "404" badge, independent of locale.
+    expect(await screen.findByText('404')).toBeTruthy();
   });
 });

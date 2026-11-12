@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 import { Routes, Route, useLocation, useParams, Navigate, BrowserRouter } from "react-router-dom";
+import { isStreamHost } from "./lib/hosts";
 import { PlayerProvider } from "./player/context/PlayerContext";
 import { PlayerAuthProvider, usePlayerAuth } from "./player/context/AuthContext";
 import { PlayerThemeProvider } from "./player/context/ThemeContext";
@@ -196,6 +197,41 @@ function withLayout(node: React.ReactNode) {
 }
 
 function AppRoutes() {
+  // Checked per render, not at module load: one build serves both hosts, and
+  // tests stub the hostname after the module has already been imported.
+  if (isStreamHost()) return <StreamRoutes />;
+  return <SiteRoutes />;
+}
+
+// The streaming app's own route tree. The root serves the player home directly,
+// so the subdomain resolves to a clean bare URL with no redirect; /programs
+// keeps rendering the same page for every existing link and the PWA's
+// start_url. Exported for tests, which mount it under MemoryRouter instead of
+// stubbing window.location.
+export function StreamRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={withLayout(<PublicHomePage />)} />
+      <Route path="/programs" element={withLayout(<PublicHomePage />)} />
+      <Route path="/programs/all" element={withLayout(<PublicProgramsPage />)} />
+      <Route path="/programs/latest" element={withLayout(<PublicLatestTracksPage />)} />
+      <Route path="/programs/search" element={withLayout(<PublicSearchPage />)} />
+      <Route path="/programs/:id" element={withLayout(<PublicProgramDetailPage />)} />
+
+      <Route path="/admin" element={<Navigate to="/admin/player" replace />} />
+      <Route path="/admin/player" element={<Navigate to="/admin/player/programs" replace />} />
+      <Route path="/admin/player/dashboard" element={<Navigate to="/admin/player/programs" replace />} />
+      <Route path="/admin/player/:page" element={<PlayerAdminSite />} />
+
+      <Route path="*" element={<NotFoundPage />} />
+    </Routes>
+  );
+}
+
+// The marketing site. The player routes are kept so local development (where
+// neither hostname matches) still reaches the whole app; in production nginx
+// redirects /programs and /admin to the stream subdomain.
+function SiteRoutes() {
   return (
     <Routes>
       {/* Portfolio Routes */}

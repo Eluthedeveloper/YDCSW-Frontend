@@ -13,6 +13,7 @@ import { RadioSchedule } from "../components/RadioSchedule";
 import { ShortwaveSchedule } from "../components/ShortwaveSchedule";
 import { useAsyncData } from "../player/hooks/useAsyncData";
 import { api, uploadUrl } from "../player/utils/api";
+import { streamUrl } from "../lib/hosts";
 import type { Announcement, SiteEvent, BlogPost } from "../player/utils/types";
 
 function Hero() {
@@ -33,10 +34,10 @@ function Hero() {
           {t("home.heroSub")}
         </p>
         <div className="mt-12 flex flex-wrap gap-4">
-          <Link to="/gallery" className="group inline-flex items-center gap-3 rounded-full bg-background px-7 py-4 text-sm font-semibold text-foreground transition hover:bg-gold">
+          <a href={streamUrl()} className="group inline-flex items-center gap-3 rounded-full bg-background px-7 py-4 text-sm font-semibold text-foreground transition hover:bg-gold">
             <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4"><path d="M8 5v14l11-7z" /></svg>
-            {t("nav.gallery")}
-          </Link>
+            {t("home.heroListen")}
+          </a>
           <Link to="/about" className="inline-flex items-center gap-2 rounded-full border border-background/30 px-7 py-4 text-sm font-semibold text-background transition hover:border-gold hover:text-gold">
             {t("nav.about")}
           </Link>
@@ -131,13 +132,13 @@ function ProgramsCTA() {
               {t("home.programsCTA.desc")}
             </p>
             <div className="mt-10 flex flex-wrap justify-center gap-4">
-              <Link to="/programs" className="inline-flex items-center gap-3 rounded-full bg-gold px-8 py-4 text-sm font-semibold text-gold-foreground shadow-[var(--shadow-gold)] transition hover:scale-105">
+              <a href={streamUrl()} className="inline-flex items-center gap-3 rounded-full bg-gold px-8 py-4 text-sm font-semibold text-gold-foreground shadow-[var(--shadow-gold)] transition hover:scale-105">
                 <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4"><path d="M8 5v14l11-7z" /></svg>
                 {t("home.programsCTA.listenNow")}
-              </Link>
-              <Link to="/programs" className="inline-flex items-center gap-2 rounded-full border border-background/30 px-8 py-4 text-sm font-semibold transition hover:border-gold hover:text-gold">
+              </a>
+              <a href={streamUrl('/programs/all')} className="inline-flex items-center gap-2 rounded-full border border-background/30 px-8 py-4 text-sm font-semibold transition hover:border-gold hover:text-gold">
                 {t("home.programsCTA.explorePrograms")}
-              </Link>
+              </a>
               <Link to="/bookshops" className="inline-flex items-center gap-2 rounded-full border border-background/30 px-8 py-4 text-sm font-semibold transition hover:border-gold hover:text-gold">
                 <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth="2">
                   <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" />
