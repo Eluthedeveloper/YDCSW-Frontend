@@ -214,7 +214,7 @@ export default function ProgramsPage() {
     setCreating(true);
     setTrackProgress(0);
     try {
-      // Chunked + resumable: a network drop mid-file costs one 5 MB chunk,
+      // Chunked + resumable: a network drop mid-file costs one chunk,
       // not the whole upload, and the bar reflects real bytes sent.
       await api.uploadTrackResumable(
         trackFile,

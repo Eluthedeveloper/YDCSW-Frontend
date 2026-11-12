@@ -206,9 +206,9 @@ function formRequestWithProgress<T>(
 // Chunked, resumable audio upload.
 //
 // A single multi-minute POST over a slow or lossy link dies on any blip and
-// restarts from zero. Splitting into ~5 MB chunks means a drop costs one chunk,
-// and `status` lets a retried call skip parts the server already has. The
-// chunk size itself comes from the server's init response so the two sides
+// restarts from zero. Splitting into small chunks means a drop costs one
+// chunk, and `status` lets a retried call skip parts the server already has.
+// The chunk size itself comes from the server's init response so the two sides
 // can never disagree.
 // ---------------------------------------------------------------------------
 
