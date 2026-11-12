@@ -49,6 +49,7 @@ function Harness() {
     toggleShuffle,
     cycleRepeat,
     dismissPlaybackError,
+    reconnect,
   } = usePlayer();
 
   return (
@@ -72,6 +73,7 @@ function Harness() {
       <button onClick={toggleShuffle}>toggleShuffle</button>
       <button onClick={cycleRepeat}>cycleRepeat</button>
       <button onClick={dismissPlaybackError}>dismissError</button>
+      <button onClick={reconnect}>reconnect</button>
     </div>
   );
 }
@@ -472,5 +474,94 @@ describe('playback errors', () => {
     });
 
     await waitFor(() => expect(read('error')).toBe('unsupported'));
+  });
+
+  // A dead connection never fires the element's `error` event, so the player
+  // used to spin forever on a frozen progress bar with no way out.
+  it('turns a stalled stream into a recoverable error instead of an endless spinner', async () => {
+    vi.useFakeTimers();
+    try {
+      mount();
+      await act(async () => {
+        screen.getByText('playA').click();
+      });
+
+      // The link dies: the element asks for data and nothing comes back.
+      await act(async () => {
+        audioEl?.dispatchEvent(new Event('waiting'));
+      });
+      expect(read('buffering')).toBe('true');
+      expect(read('error')).toBe('none');
+
+      await act(async () => {
+        vi.advanceTimersByTime(12_000);
+      });
+
+      expect(read('error')).toBe('network');
+      expect(read('buffering')).toBe('false');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // A stall that recovers on its own must not be reported as a failure.
+  it('leaves a recovered stream alone', async () => {
+    vi.useFakeTimers();
+    try {
+      mount();
+      await act(async () => {
+        screen.getByText('playA').click();
+      });
+
+      await act(async () => {
+        audioEl?.dispatchEvent(new Event('waiting'));
+      });
+      await act(async () => {
+        audioEl?.dispatchEvent(new Event('canplay'));
+        vi.advanceTimersByTime(12_000);
+      });
+
+      expect(read('error')).toBe('none');
+      expect(read('buffering')).toBe('false');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // `resume()` cannot recover a stall: the element still holds the dead
+  // response, so play() resolves and no sound comes out. The source has to be
+  // requested again, and the position restored by hand.
+  it('re-requests the stream on retry and resumes where it stopped', async () => {
+    mount();
+    await act(async () => {
+      screen.getByText('playA').click();
+    });
+
+    let time = 42;
+    Object.defineProperty(audioEl!, 'currentTime', {
+      configurable: true,
+      get: () => time,
+      set: (v: number) => {
+        time = v;
+      },
+    });
+    // A fresh source starts at zero, like the browser does.
+    vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(function load(
+      this: HTMLMediaElement
+    ) {
+      time = 0;
+    });
+
+    await act(async () => {
+      screen.getByText('reconnect').click();
+    });
+
+    expect(audioEl!.src).toContain('/uploads/tracks/a.stream');
+    expect(time).toBe(42);
+
+    await act(async () => {
+      audioEl?.dispatchEvent(new Event('loadedmetadata'));
+    });
+    expect(time).toBe(42);
   });
 });

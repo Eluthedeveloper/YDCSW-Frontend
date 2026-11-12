@@ -36,6 +36,8 @@ interface PlayerContextType {
   play: (track: Track, list?: Track[]) => void;
   pause: () => void;
   resume: () => void;
+  /** Re-requests the stream and picks up where it stopped. */
+  reconnect: () => void;
   seek: (time: number) => void;
   startSeeking: () => void;
   endSeeking: () => void;
@@ -77,12 +79,42 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const lastListenAtRef = useRef<Record<string, number>>({});
   const shuffleRef = useRef(shuffle);
   const repeatModeRef = useRef(repeatMode);
+  const stallTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // The media element listeners below are registered once on mount and need to
   // reach the current `play`, but registering them before `play` is declared
   // would capture a stale closure. A ref keeps them pointed at the live one.
   const playRef = useRef<(track: Track, list?: Track[]) => void>(() => {});
   const endedRef = useRef<() => void>(() => {});
+
+  /**
+   * A stalled download never fires the element's `error` event, so a dead
+   * mobile connection used to leave the buffering spinner turning and the
+   * progress bar frozen, with nothing the listener could act on. The watchdog
+   * turns that silence into the same error-and-retry the other failures use.
+   */
+  const STALL_TIMEOUT_MS = 12000;
+
+  const clearStallWatchdog = useCallback(() => {
+    if (stallTimerRef.current !== null) {
+      clearTimeout(stallTimerRef.current);
+      stallTimerRef.current = null;
+    }
+  }, []);
+
+  const armStallWatchdog = useCallback(() => {
+    clearStallWatchdog();
+    stallTimerRef.current = setTimeout(() => {
+      stallTimerRef.current = null;
+      const audio = audioRef.current;
+      // readyState 3 is HAVE_FUTURE_DATA: the browser recovered on its own and
+      // the element can play, so there is nothing to report.
+      if (!audio || audio.readyState >= 3) return;
+      setIsBuffering(false);
+      setPlaybackError('network');
+    }, STALL_TIMEOUT_MS);
+  }, [clearStallWatchdog]);
+
 
   /**
    * Classifies a MediaError. Codes per the HTML spec: 1 aborted, 2 network,
@@ -144,7 +176,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const audio = new Audio();
     audio.crossOrigin = 'anonymous';
-    audio.preload = 'auto';
+    // `metadata` rather than `auto`: a track is tens of megabytes, and `auto`
+    // makes the browser download all of it before it will start playing. On a
+    // mobile connection that is a spinner with a frozen progress bar for
+    // minutes, which reads as a broken player. `metadata` fetches only enough
+    // to begin, and the rest streams in as playback proceeds.
+    audio.preload = 'metadata';
     audio.volume = volume;
     audioRef.current = audio;
 
@@ -181,6 +218,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
     audio.addEventListener('playing', () => {
       setIsBuffering(false);
+      clearStallWatchdog();
       const pending = pendingListenRef.current;
       if (pending) {
         pendingListenRef.current = null;
@@ -188,9 +226,18 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         if (track && track.id === pending) recordListenIfDue(track);
       }
     });
-    audio.addEventListener('waiting', () => setIsBuffering(true));
-    audio.addEventListener('canplay', () => setIsBuffering(false));
-    audio.addEventListener('stalled', () => setIsBuffering(true));
+    audio.addEventListener('waiting', () => {
+      setIsBuffering(true);
+      armStallWatchdog();
+    });
+    audio.addEventListener('canplay', () => {
+      setIsBuffering(false);
+      clearStallWatchdog();
+    });
+    audio.addEventListener('stalled', () => {
+      setIsBuffering(true);
+      armStallWatchdog();
+    });
 
     // The element is the single source of truth for playing state. Relying
     // only on optimistic React writes desynced after a production 429 or a
@@ -200,6 +247,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     audio.addEventListener('pause', () => setIsPlaying(false));
 
     return () => {
+      clearStallWatchdog();
       audio.pause();
       audio.removeAttribute('src');
       audio.load();
@@ -273,6 +321,50 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         });
     }
   }, [initAudioContext, classifyMediaError]);
+
+  /**
+   * Re-requests the stream and picks up where it stopped.
+   *
+   * `resume()` cannot recover a stalled download: the element is still
+   * holding the dead response, so `play()` resolves and no sound comes out —
+   * the retry button appeared to do nothing. The source has to be requested
+   * again, and the position restored by hand, because a fresh element starts
+   * at zero.
+   */
+  const reconnect = useCallback(() => {
+    const audio = audioRef.current;
+    const track = currentTrackRef.current;
+    if (!audio || !track) return;
+
+    const at = audio.currentTime || 0;
+    // Seeking into a stream whose metadata has not loaded yet throws, so the
+    // restore waits for `loadedmetadata` and is also attempted immediately in
+    // case the browser already has it cached.
+    const restore = () => {
+      if (at <= 0) return;
+      try {
+        audio.currentTime = at;
+      } catch {
+        // The browser refused the seek; playback still restarts from the top.
+      }
+    };
+
+    audio.addEventListener('loadedmetadata', restore, { once: true });
+    audio.src = trackStreamUrl(track.file_path);
+    audio.load();
+    restore();
+
+    clearStallWatchdog();
+    setPlaybackError(null);
+    setIsBuffering(false);
+    void audio.play()
+      .then(() => setIsPlaying(true))
+      .catch((err: unknown) => {
+        setIsPlaying(false);
+        if (err instanceof Error && err.name === 'NotSupportedError') return;
+        setPlaybackError(classifyMediaError() ?? 'unknown');
+      });
+  }, [classifyMediaError, clearStallWatchdog]);
 
   const close = useCallback(() => {
     if (audioRef.current) {
@@ -467,7 +559,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       currentTrack, playlist, isPlaying, isBuffering, volume, progress, duration, isSeeking,
       analyserNode,
       shuffle, repeatMode, toggleShuffle, cycleRepeat, playbackError, dismissPlaybackError,
-      play, pause, resume, close, seek, startSeeking, endSeeking, setVolume, next, prev,
+      play, pause, resume, reconnect, close, seek, startSeeking, endSeeking, setVolume, next, prev,
       skipForward, skipBack,
     }}>
       {children}

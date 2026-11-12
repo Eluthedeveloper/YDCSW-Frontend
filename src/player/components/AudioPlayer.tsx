@@ -294,7 +294,7 @@ function CoverArt({ src, size, className = '' }: { src?: string; size: string; c
 export default function AudioPlayer() {
   const {
     currentTrack, isPlaying, isBuffering, volume, progress, duration,
-    pause, resume, seek, startSeeking, endSeeking, setVolume, next, prev, close,
+    pause, resume, reconnect, seek, startSeeking, endSeeking, setVolume, next, prev, close,
     skipForward, skipBack,
     shuffle, repeatMode, toggleShuffle, cycleRepeat,
     playbackError, dismissPlaybackError,
@@ -329,7 +329,10 @@ export default function AudioPlayer() {
 
   const retry = () => {
     dismissPlaybackError();
-    if (currentTrack) resume();
+    // A stalled download cannot be resumed — the element is still holding the
+    // dead response, so play() resolves and nothing comes out. The source has
+    // to be requested again.
+    if (currentTrack) reconnect();
   };
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
