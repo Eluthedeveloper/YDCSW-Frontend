@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -42,6 +42,10 @@ describe('NotificationBell', () => {
   beforeEach(() => {
     getWhatsNew.mockReset();
     localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('stays quiet for content the visitor has already seen', async () => {
@@ -104,5 +108,24 @@ describe('NotificationBell', () => {
 
     expect(screen.getByRole('button', { name: "What's New" })).toBeInTheDocument();
     expect(localStorage.getItem(SEEN_KEY)).toBeTruthy();
+  });
+
+  // The bell also renders inside the player. Marketing routes like `/` and
+  // `/blog/:slug` are not in the streaming app's route tree, so opening an item
+  // there used to hit the 404 page. On the stream host the click must leave for
+  // the main site instead of going through the router.
+  it('opens news items on the main site when rendered on the stream subdomain', async () => {
+    const assign = vi.fn();
+    vi.stubGlobal('location', { hostname: 'listen.yemisrachdimts.org', assign });
+    localStorage.setItem(SEEN_KEY, String(Date.now() - 60 * 60_000));
+    getWhatsNew.mockResolvedValue(feed(5));
+
+    const user = userEvent.setup();
+    renderBell();
+
+    await user.click(await screen.findByRole('button', { name: /new update/ }));
+    await user.click(await screen.findByText('New building dedicated'));
+
+    expect(assign).toHaveBeenCalledWith('https://yemisrachdimts.org/');
   });
 });

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Bell, Newspaper, Megaphone, CalendarDays, CheckCheck, Sparkles } from "lucide-react";
 import { api, uploadUrl } from "../player/utils/api";
+import { isStreamHost, mainSiteUrl } from "../lib/hosts";
 import type { WhatsNewItem } from "../player/utils/types";
 
 /**
@@ -143,6 +144,14 @@ export default function NotificationBell({ variant = 'navy', className = '' }: P
     // the list, so re-blinking the same rows after a navigation is noise.
     markAllRead();
     setOpen(false);
+    // On the stream subdomain the bell still shows site news, but those items
+    // point at marketing routes (`/blog/:slug`, `/events/...`, `/`) that do not
+    // exist in the player's route tree. Pushing them through the router would
+    // land on the 404 page, so hand off to the main site instead.
+    if (isStreamHost()) {
+      window.location.assign(mainSiteUrl(item.url));
+      return;
+    }
     navigate(item.url);
   };
 

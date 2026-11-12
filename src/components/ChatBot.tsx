@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
 import { MessageCircle, X, Send, RotateCcw } from 'lucide-react';
 import { API_BASE } from '../lib/apiBase';
+import { isStreamHost } from '../lib/hosts';
 
 /**
  * Floating visitor assistant.
@@ -231,6 +232,11 @@ export default function ChatBot() {
 
   // Admin screens have their own workflows and no reason to offer visitor Q&A.
   if (pathname.startsWith('/admin')) return null;
+
+  // The assistant is a marketing-site facility (organisation Q&A, contact
+  // help). The player subdomain is a listening surface, so the button would
+  // only sit on top of the audio controls there.
+  if (isStreamHost()) return null;
 
   return (
     <div className="chat-widget">

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -21,6 +21,10 @@ describe('ChatBot', () => {
     fetchMock.mockReset();
     vi.stubGlobal('fetch', fetchMock);
     await i18n.changeLanguage('en');
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('opens the panel with the greeting and suggested questions', async () => {
@@ -122,6 +126,14 @@ describe('ChatBot', () => {
 
   it('stays out of the admin screens', () => {
     renderBot('/admin/player/programs');
+    expect(screen.queryByRole('button', { name: 'Open chat' })).not.toBeInTheDocument();
+  });
+
+  // The assistant belongs to the marketing site; the player subdomain should
+  // stay a pure listening surface with nothing floating over the audio bar.
+  it('stays off the streaming subdomain', () => {
+    vi.stubGlobal('location', { hostname: 'listen.yemisrachdimts.org' });
+    renderBot();
     expect(screen.queryByRole('button', { name: 'Open chat' })).not.toBeInTheDocument();
   });
 });

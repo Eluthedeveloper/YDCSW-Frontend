@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { isStreamHost, STREAM_HOST } from './hosts';
+import { isStreamHost, mainSiteUrl, STREAM_HOST } from './hosts';
 
 describe('isStreamHost', () => {
   afterEach(() => {
@@ -27,5 +27,17 @@ describe('isStreamHost', () => {
 
   it('does not match the API subdomain', () => {
     expect(isStreamHost('audiostreaming.yemisrachdimts.org')).toBe(false);
+  });
+});
+
+describe('mainSiteUrl', () => {
+  it('turns news routes into absolute marketing-site URLs', () => {
+    expect(mainSiteUrl('/blog/some-post')).toBe('https://yemisrachdimts.org/blog/some-post');
+    expect(mainSiteUrl('/events/42')).toBe('https://yemisrachdimts.org/events/42');
+  });
+
+  it('maps the bare root to the marketing home', () => {
+    expect(mainSiteUrl('/')).toBe('https://yemisrachdimts.org/');
+    expect(mainSiteUrl()).toBe('https://yemisrachdimts.org/');
   });
 });

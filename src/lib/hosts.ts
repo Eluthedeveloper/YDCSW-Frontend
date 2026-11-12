@@ -8,6 +8,18 @@ export const STREAM_HOST = import.meta.env.VITE_STREAM_HOST || 'listen.yemisrach
 /** Where the marketing site lives, for links that leave the streaming app. */
 export const MAIN_SITE_URL = 'https://yemisrachdimts.org';
 
+/**
+ * Absolute URL for a marketing-site path.
+ *
+ * Used where the player shows site content that only the marketing app can
+ * render (news items behind the "What's New" bell live at `/blog/:slug`,
+ * `/events/...`). Resolved through URL so a bare `'/'` and a path with or
+ * without a leading slash all come out well-formed.
+ */
+export function mainSiteUrl(path = '/'): string {
+  return new URL(path, MAIN_SITE_URL).toString();
+}
+
 export function isStreamHost(hostname: string = window.location.hostname): boolean {
   return hostname === STREAM_HOST;
 }
