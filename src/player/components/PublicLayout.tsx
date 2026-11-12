@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import { Home, FolderOpen, Music, Search, Menu, X } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 import Footer from './Footer';
-import NotificationBell from '../../components/NotificationBell';
 import ProgramsPwa from './ProgramsPwa';
 
 interface Props {
@@ -56,7 +55,6 @@ export default function PublicLayout({ children }: Props) {
             </nav>
           </div>
           <div className="flex items-center gap-2">
-            <NotificationBell variant="panel" />
             <ThemeToggle />
             <button onClick={() => navigate('/admin/player')}
               className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium dark:text-dark-200 text-dark-600 hover:text-primary-400 dark:hover:bg-dark-500/50 hover:bg-light-300/50 transition-all border dark:border-white/10 border-dark-300">
