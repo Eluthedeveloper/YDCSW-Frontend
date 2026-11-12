@@ -373,6 +373,9 @@ export const api = {
 
   getPrograms: () => request<Program[]>('/programs/'),
   getProgram: (id: string) => request<Program>(`/programs/${id}`),
+  /** Saves the admin's programme order; the whole ordered id list is sent. */
+  reorderPrograms: (order: string[]) =>
+    request<{ message: string }>('/programs/reorder', { method: 'PUT', body: JSON.stringify({ order }) }),
   getComments: (programId: string) => request<Comment[]>(`/programs/${programId}/comments`),
   getAllComments: () => request<Comment[]>('/programs/comments/all'),
   createProgram: (data: FormData, onProgress?: (percent: number) => void) =>

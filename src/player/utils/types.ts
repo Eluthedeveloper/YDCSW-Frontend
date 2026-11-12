@@ -18,6 +18,8 @@ export interface Program {
   creator_name?: string;
   /** Always returned by the API for programs; optional only for optimistic UI. */
   created_at: string;
+  /** Admin-controlled position in the library; lower comes first. */
+  sort_order?: number;
   track_count?: number;
   comment_count?: number;
   like_count?: number;

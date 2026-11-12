@@ -43,6 +43,7 @@ export default function ProgramsPage() {
   const [editingProgram, setEditingProgram] = useState<Program | null>(null);
   const [editProgramForm, setEditProgramForm] = useState({ title: '', description: '' });
   const [editCoverFile, setEditCoverFile] = useState<File | null>(null);
+  const [savingOrder, setSavingOrder] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -103,6 +104,27 @@ export default function ProgramsPage() {
     } catch (err: unknown) {
       toast.error(errorMessage(err, 'Failed to create program'));
     } finally { setCreating(false); setCoverProgress(null); }
+  };
+
+  const moveProgram = async (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (savingOrder || target < 0 || target >= programs.length) return;
+
+    // Optimistic: the arrows feel instant, and a failed save rolls the grid
+    // back so the screen never disagrees with the server.
+    const previous = programs;
+    const next = [...programs];
+    [next[index], next[target]] = [next[target], next[index]];
+    setPrograms(next);
+    setSavingOrder(true);
+    try {
+      await api.reorderPrograms(next.map((program) => program.id));
+    } catch (err: unknown) {
+      setPrograms(previous);
+      toast.error(errorMessage(err, 'Could not save the new order'));
+    } finally {
+      setSavingOrder(false);
+    }
   };
 
   const deleteProgram = async (id: string) => {
@@ -322,11 +344,27 @@ export default function ProgramsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {programs.map((p) => (
+          {programs.map((p, index) => (
             <div key={p.id} className={`glass-panel rounded-xl overflow-hidden cursor-pointer transition-all hover:border-primary-600/30 ${selectedProgram === p.id ? 'ring-1 ring-primary-600/50' : ''}`}
               onClick={() => loadTracks(p.id)}>
               <div className="h-36 dark:bg-dark-600 bg-light-200 flex items-center justify-center relative">
                 <CoverBg src={p.cover_image} fallbackSize={36} />
+                {/* Library order is what visitors see first; the arrows save
+                    the whole arrangement on every click. */}
+                <div className="absolute top-2 left-2 flex items-center gap-1.5 z-10">
+                  <button aria-label={`Move ${p.title} up`} title="Move up"
+                    disabled={savingOrder || index === 0}
+                    onClick={(e) => { e.stopPropagation(); moveProgram(index, -1); }}
+                    className="p-1.5 rounded-lg bg-black/60 hover:bg-black/80 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                    <ChevronUp size={14} />
+                  </button>
+                  <button aria-label={`Move ${p.title} down`} title="Move down"
+                    disabled={savingOrder || index === programs.length - 1}
+                    onClick={(e) => { e.stopPropagation(); moveProgram(index, 1); }}
+                    className="p-1.5 rounded-lg bg-black/60 hover:bg-black/80 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                    <ChevronDown size={14} />
+                  </button>
+                </div>
                 {isSuperAdmin && (
                   <div className="absolute top-2 right-2 flex items-center gap-1.5 z-10">
                     <button aria-label={`Edit program ${p.title}`} title="Edit program" onClick={(e) => startEditProgram(p, e)} className="p-1.5 rounded-lg bg-black/60 hover:bg-black/80 text-white transition-colors">
