@@ -12,10 +12,36 @@ interface Props {
 }
 
 export default function PublicLayout({ children }: Props) {
-  const { t } = useTranslation('programs');
+  const { t, i18n } = useTranslation('programs');
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+
+  const LANGUAGES = [
+    { code: 'en', label: 'ENG' },
+    { code: 'am', label: 'AMH' },
+    { code: 'om', label: 'OR' },
+  ];
+
+  const languageSelect = (
+    <>
+      <label htmlFor="player-language" className="sr-only">
+        {t('publicNav.language')}
+      </label>
+      <select
+        id="player-language"
+        value={i18n.resolvedLanguage || 'en'}
+        onChange={(e) => i18n.changeLanguage(e.target.value)}
+        className="shrink-0 cursor-pointer rounded-full border dark:border-white/10 border-dark-300 dark:bg-dark-500/50 bg-light-300/50 px-2.5 py-1.5 text-xs font-semibold tracking-wide dark:text-dark-200 text-dark-600 transition hover:text-primary-400 dark:hover:border-primary-600/40 hover:border-primary-600/40 focus:border-primary-600 focus:outline-none"
+      >
+        {LANGUAGES.map(({ code, label }) => (
+          <option key={code} value={code} className="dark:bg-dark-600 bg-light-200">
+            {label}
+          </option>
+        ))}
+      </select>
+    </>
+  );
 
   const navItems = [
     { id: '/programs', label: t('publicNav.home'), icon: Home },
@@ -55,6 +81,7 @@ export default function PublicLayout({ children }: Props) {
             </nav>
           </div>
           <div className="flex items-center gap-2">
+            {languageSelect}
             <ThemeToggle />
             <button onClick={() => navigate('/admin/player')}
               className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium dark:text-dark-200 text-dark-600 hover:text-primary-400 dark:hover:bg-dark-500/50 hover:bg-light-300/50 transition-all border dark:border-white/10 border-dark-300">
@@ -67,6 +94,7 @@ export default function PublicLayout({ children }: Props) {
         </div>
         {mobileOpen && (
           <div className="md:hidden border-t p-3 space-y-1">
+            {languageSelect}
             {navItems.map((item) => (
               <button key={item.id} onClick={() => { navigate(item.id); setMobileOpen(false); }}
                 className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${

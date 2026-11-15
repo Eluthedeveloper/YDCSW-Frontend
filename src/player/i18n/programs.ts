@@ -82,6 +82,7 @@ export const programsEn = {
     backHome: "Back to Home",
     admin: "Admin",
     brand: "Yemisrach Dimts",
+    language: "Language",
   },
   audioPlayer: {
     playingFrom: "Playing from",
@@ -202,6 +203,7 @@ export const programsAm: typeof programsEn = {
     backHome: "ወደ መነሻ ተመለስ",
     admin: "አስተዳዳሪ",
     brand: "የምሥራች ድምፅ",
+    language: "ቋንቋ",
   },
   audioPlayer: {
     playingFrom: "እየተጫወተ ያለው ከ",
@@ -326,6 +328,7 @@ export const programsOm: typeof programsEn = {
     backHome: "Fuula Jalqabaa Deebi'i",
     admin: "Admin",
     brand: "Sagalee Misiraachoo",
+    language: "Afaan",
   },
   audioPlayer: {
     playingFrom: "taphachaa jira",

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
-import { usePlayer } from '../context/PlayerContext';
+import { useTranslation } from 'react-i18next';import { usePlayer } from '../context/PlayerContext';
 import { usePlayerAuth } from '../context/AuthContext';
 import type { Comment, Program, Track } from '../utils/types';
 import { api } from '../utils/api';
@@ -97,11 +96,11 @@ export default function PublicProgramDetailPage() {
         </div>
         <div className="flex-1">
           <h2 className="text-3xl font-bold dark:text-white text-dark-900 mb-2">{program.title}</h2>
-          <p className="dark:text-dark-200 text-dark-600 mb-4">{program.description || 'No description'}</p>
+          <p className="dark:text-dark-200 text-dark-600 mb-4">{program.description || t('programDetail.noDescription')}</p>
           <div className="flex items-center gap-4 text-sm dark:text-dark-300 text-dark-500">
-            <span className="flex items-center gap-1"><Music size={14} /> {program.tracks?.length || 0} tracks</span>
-            <span className="flex items-center gap-1"><Heart size={14} /> {program.like_count || 0} likes</span>
-            <span className="flex items-center gap-1"><MessageCircle size={14} /> {program.comment_count || 0} comments</span>
+            <span className="flex items-center gap-1"><Music size={14} /> {program.tracks?.length || 0} {t('programDetail.tracksLabel')}</span>
+            <span className="flex items-center gap-1"><Heart size={14} /> {program.like_count || 0} {t('programDetail.likesLabel')}</span>
+            <span className="flex items-center gap-1"><MessageCircle size={14} /> {program.comment_count || 0} {t('programDetail.commentsLabel')}</span>
             <span className="flex items-center gap-1"><Clock size={14} /> {new Date(program.created_at).toLocaleDateString()}</span>
           </div>
         </div>
@@ -109,21 +108,21 @@ export default function PublicProgramDetailPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
-          <h3 className="text-sm font-semibold dark:text-dark-100 text-dark-700 uppercase tracking-wider mb-3">Tracks</h3>
+          <h3 className="text-sm font-semibold dark:text-dark-100 text-dark-700 uppercase tracking-wider mb-3">{t('programDetail.tracks')}</h3>
           {program.tracks?.length === 0 ? (
             <div className="text-center py-12 glass-panel rounded-xl">
-              <p className="dark:text-dark-300 text-dark-500">No tracks in this program yet</p>
+              <p className="dark:text-dark-300 text-dark-500">{t('programDetail.noTracks')}</p>
             </div>
           ) : (
             <div className="space-y-2">
-              {program.tracks?.map((t: Track, i: number) => (
-                <TrackRow key={t.id} track={t} index={i + 1}
-                  isActive={currentTrack?.id === t.id}
-                  isPlaying={currentTrack?.id === t.id && isPlaying}
+              {program.tracks?.map((tr: Track, i: number) => (
+                <TrackRow key={tr.id} track={tr} index={i + 1}
+                  isActive={currentTrack?.id === tr.id}
+                  isPlaying={currentTrack?.id === tr.id && isPlaying}
                   onPlay={() => {
-                    if (currentTrack?.id === t.id && isPlaying) { pause(); }
-                    else if (currentTrack?.id === t.id && !isPlaying) { resume(); }
-                    else { play(t, program.tracks); }
+                    if (currentTrack?.id === tr.id && isPlaying) { pause(); }
+                    else if (currentTrack?.id === tr.id && !isPlaying) { resume(); }
+                    else { play(tr, program.tracks); }
                   }} />
               ))}
             </div>
@@ -132,16 +131,16 @@ export default function PublicProgramDetailPage() {
 
         <div>
           <h3 className="text-sm font-semibold dark:text-dark-100 text-dark-700 uppercase tracking-wider mb-3 flex items-center gap-2">
-            <MessageCircle size={14} /> Comments
+            <MessageCircle size={14} /> {t('programDetail.comments')}
           </h3>
           <form onSubmit={handleComment} className="glass-panel rounded-xl p-4 mb-4">
-            <input type="text" placeholder="Your name" value={commentName} onChange={(e) => setCommentName(e.target.value)}
+            <input type="text" placeholder={t('programDetail.yourName')} value={commentName} onChange={(e) => setCommentName(e.target.value)}
               className="w-full px-3 py-2 dark:bg-dark-600 bg-white dark:border-white/5 border-dark-300 rounded-lg dark:text-white text-dark-900 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-primary-600" required />
-            <textarea placeholder="Leave a comment..." value={commentText} onChange={(e) => setCommentText(e.target.value)}
+            <textarea placeholder={t('programDetail.leaveComment')} value={commentText} onChange={(e) => setCommentText(e.target.value)}
               className="w-full px-3 py-2 dark:bg-dark-600 bg-white dark:border-white/5 border-dark-300 rounded-lg dark:text-white text-dark-900 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-primary-600 h-20 resize-none" required />
             <button type="submit" disabled={submitting}
               className="w-full py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-all">
-              {submitting ? 'Posting...' : 'Post Comment'}
+              {submitting ? t('programDetail.posting') : t('programDetail.postComment')}
             </button>
           </form>
           {isAdmin ? (
@@ -149,7 +148,7 @@ export default function PublicProgramDetailPage() {
               {commentsLoading ? (
                 <div className="flex justify-center py-4"><div className="w-6 h-6 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" /></div>
               ) : comments.length === 0 ? (
-                <p className="text-sm dark:text-dark-300 text-dark-500 text-center py-4">No comments yet</p>
+                <p className="text-sm dark:text-dark-300 text-dark-500 text-center py-4">{t('programDetail.noComments')}</p>
               ) : (
                 comments.map((c: Comment) => (
                   <div key={c.id} className="glass-panel rounded-xl p-4">
@@ -168,7 +167,7 @@ export default function PublicProgramDetailPage() {
           ) : (
             <div className="glass-panel rounded-xl p-4 text-center">
               <Lock size={18} className="dark:text-dark-400 text-dark-500 mx-auto mb-1" />
-              <p className="text-xs dark:text-dark-300 text-dark-500">Comments are visible to admins only</p>
+              <p className="text-xs dark:text-dark-300 text-dark-500">{t('programDetail.adminCommentsOnly')}</p>
             </div>
           )}
         </div>
@@ -180,6 +179,8 @@ export default function PublicProgramDetailPage() {
 function TrackRow({ track, index, isActive, isPlaying, onPlay }: {
   track: Track; index: number; isActive: boolean; isPlaying: boolean; onPlay: () => void;
 }) {
+  const { t } = useTranslation('programs');
+
   return (
     <div onClick={onPlay}
       className={`flex items-center gap-1.5 sm:gap-4 p-2 sm:p-3 rounded-xl cursor-pointer transition-all group ${
@@ -193,7 +194,7 @@ function TrackRow({ track, index, isActive, isPlaying, onPlay }: {
       </button>
       <div className="flex-1 min-w-0">
         <p className={`text-[13px] sm:text-sm font-medium truncate ${isActive ? 'text-primary-400' : 'dark:text-white text-dark-900'}`}>{track.title}</p>
-        <p className="text-[11px] sm:text-xs dark:text-dark-200 text-dark-600 truncate">{track.artist || 'Unknown'}</p>
+        <p className="text-[11px] sm:text-xs dark:text-dark-200 text-dark-600 truncate">{track.artist || t('programDetail.unknown')}</p>
       </div>
       {track.track_type && (
         <span className="hidden sm:inline text-[10px] dark:text-dark-300 text-dark-500 uppercase dark:bg-dark-600 bg-light-200 px-2 py-0.5 rounded flex-shrink-0">{track.track_type}</span>
