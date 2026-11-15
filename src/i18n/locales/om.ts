@@ -73,7 +73,7 @@ const om = {
       heading: "Wangeela bakka hundaatti dhaggeefadha.",
       desc: "Raadiyo Sagalee Missirachoo waaqeffannaa, barsiisa, fi ragaa yeroo hunda tamsaasa. Akka oofnu, hojjemnu ykn kadhannu, nu waliin jirta.",
       listen: "Tamsaasaa Kallattii dhaggeffadhaa",
-      comingSoon: "Dhiyootti ni Eega",
+      comingSoon: "Dhiyootti nu Eegaa",
       hide: "Raadiyoo cufi",
       schedule: "Toora Sagantaa keenya",
       popup: "Akkasitti caqasuuf foddaa haaraa bani",
