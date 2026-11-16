@@ -5,6 +5,15 @@ interface Props {
   children: ReactNode;
 }
 
+// Vite names every bundle with a content hash, so after a redeploy an
+// already-open tab runs old code whose lazy() imports point at filenames the
+// server no longer has. The service worker's clientsClaim also takes over open
+// tabs while an update activates. Both failures surface as a thrown error in
+// the lazy boundary, and one reload of index.html fixes them.
+const CHUNK_LOAD_FAILED =
+  /failed to fetch dynamically imported module|importing a module script failed|error loading dynamically imported module/i;
+const CHUNK_RELOAD_AT = 'chunk-reload-at';
+
 interface State {
   error: Error | null;
   /** React dev builds provide where in the render tree the error came from. */
@@ -29,6 +38,16 @@ export default class ErrorBoundary extends Component<Props, State> {
   render() {
     const { error, componentStack } = this.state;
     if (!error) return this.props.children;
+
+    if (
+      import.meta.env.PROD &&
+      CHUNK_LOAD_FAILED.test(error.message) &&
+      Date.now() - Number(sessionStorage.getItem(CHUNK_RELOAD_AT) ?? 0) > 3_000
+    ) {
+      sessionStorage.setItem(CHUNK_RELOAD_AT, String(Date.now()));
+      window.location.reload();
+      return null;
+    }
 
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-white dark:bg-dark-800">

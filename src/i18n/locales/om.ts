@@ -181,7 +181,7 @@ const om = {
     },
     info: [
       { label: "Iimeelii", value: "info@yemisrachdimts.org", sub: "Gaaffii waliigalaa" },
-      { label: "Hojiiwwan", value: "give@yemisrachdimts.org", sub: "Hirmaattota tajaajilaa fi kennan" },
+      { label: "Hojiiwwan", value: "yemisrachdimts@gmail.com", sub: "Hirmaattota tajaajilaa fi kennan" },
       { label: "Laalcha", value: "press@yemisrachdimts.org", sub: "Gaaffii fi meeqaa miidiyaa" },
       { label: "Studioo", value: "Finfinnee, Itoophiyaa", sub: "Kallattii baatii ti" },
     ],
