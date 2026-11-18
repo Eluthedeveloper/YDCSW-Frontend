@@ -321,6 +321,9 @@ export default function ProgramsPage() {
       const result = await api.assignTrackGroup(selectedTrackIds, bulkGroup.trim() || null);
       toast.success(`Group updated for ${result.updated} ${result.updated === 1 ? 'track' : 'tracks'}`);
       setBulkGroup('');
+      // Clear the selection: leaving it checked means the next "Set group"
+      // also moves this batch, which reads as the new group swallowing the old.
+      setSelectedTrackIds([]);
       loadTracks(selectedProgram);
     } catch (err: unknown) {
       toast.error(errorMessage(err, 'Failed to update group'));
