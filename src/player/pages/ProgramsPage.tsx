@@ -8,8 +8,9 @@ import CoverBg from '../components/CoverBg';
 import BulkUploadModal from '../components/BulkUploadModal';
 import { toast } from 'sonner';
 import { readAudioMetadata, type AudioMetadata } from '../utils/metadata';
-import { FolderOpen, Plus, Trash2, Play, Pause, Upload, X, Loader2, ChevronUp, ChevronDown, ListMusic, FileAudio, Pencil, Check } from 'lucide-react';
+import { FolderOpen, Plus, Trash2, Play, Pause, Upload, X, Loader2, ChevronUp, ChevronDown, ChevronRight, ListMusic, FileAudio, Pencil, Check } from 'lucide-react';
 import type { Program, Track } from '../utils/types';
+import { groupKeyOf, groupTracks } from '../utils/trackGroups';
 
 // Mirrors the backend's cover cap (programs.ts MAX_COVER_BYTES) so an oversized
 // image is rejected before the upload starts. Without this the request is sent,
@@ -31,7 +32,11 @@ export default function ProgramsPage() {
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ title: '', description: '' });
   const [coverFile, setCoverFile] = useState<File | null>(null);
-  const [trackForm, setTrackForm] = useState({ title: '', artist: '', album: '', track_type: 'episode' });
+  const [trackForm, setTrackForm] = useState({ title: '', artist: '', album: '', group_name: '', track_type: 'episode' });
+  const [bulkGroup, setBulkGroup] = useState('');
+  // Admin sections start collapsed: the panel lists group names first, and
+  // clicking one expands its tracks.
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
   const [trackFile, setTrackFile] = useState<File | null>(null);
   const [detectingMeta, setDetectingMeta] = useState(false);
   const [metaFound, setMetaFound] = useState(false);
@@ -39,7 +44,7 @@ export default function ProgramsPage() {
   const [trackProgress, setTrackProgress] = useState<number | null>(null);
   const [coverProgress, setCoverProgress] = useState<number | null>(null);
   const [editingTrackId, setEditingTrackId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ title: '', artist: '', album: '', track_type: '' });
+  const [editForm, setEditForm] = useState({ title: '', artist: '', album: '', group_name: '', track_type: '' });
   const [editingProgram, setEditingProgram] = useState<Program | null>(null);
   const [editProgramForm, setEditProgramForm] = useState({ title: '', description: '' });
   const [editCoverFile, setEditCoverFile] = useState<File | null>(null);
@@ -75,7 +80,10 @@ export default function ProgramsPage() {
   };
 
   const loadTracks = async (programId: string) => {
-    if (programId !== selectedProgram) setSelectedTrackIds([]);
+    if (programId !== selectedProgram) {
+      setSelectedTrackIds([]);
+      setOpenGroups(new Set());
+    }
     setSelectedProgram(programId);
     try {
       const data = await api.getTracks(programId);
@@ -224,11 +232,12 @@ export default function ProgramsPage() {
           album: trackForm.album,
           program_id: selectedProgram,
           track_type: trackForm.track_type,
+          group_name: trackForm.group_name.trim() || null,
         },
         setTrackProgress
       );
       setShowUploadTrack(false);
-      setTrackForm({ title: '', artist: '', album: '', track_type: 'episode' });
+      setTrackForm({ title: '', artist: '', album: '', group_name: '', track_type: 'episode' });
       setTrackFile(null);
       loadTracks(selectedProgram);
       loadPrograms();
@@ -297,19 +306,49 @@ export default function ProgramsPage() {
     });
   };
 
-  const moveTrack = async (index: number, direction: 'up' | 'down') => {
+  const toggleGroup = (key: string) => {
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const assignGroupToSelected = async () => {
+    if (selectedTrackIds.length === 0 || !selectedProgram) return;
+    try {
+      const result = await api.assignTrackGroup(selectedTrackIds, bulkGroup.trim() || null);
+      toast.success(`Group updated for ${result.updated} ${result.updated === 1 ? 'track' : 'tracks'}`);
+      setBulkGroup('');
+      loadTracks(selectedProgram);
+    } catch (err: unknown) {
+      toast.error(errorMessage(err, 'Failed to update group'));
+    }
+  };
+
+  const moveTrack = async (id: string, direction: 'up' | 'down') => {
+    const index = tracks.findIndex((t) => t.id === id);
+    if (index < 0) return;
     const newIndex = direction === 'up' ? index - 1 : index + 1;
     if (newIndex < 0 || newIndex >= tracks.length) return;
+    // Reordering is within a section only; swapping across a group boundary
+    // would leave the rows and their section headers disagreeing.
+    if (groupKeyOf(tracks[index]!) !== groupKeyOf(tracks[newIndex]!)) return;
     const newTracks = [...tracks];
     [newTracks[index], newTracks[newIndex]] = [newTracks[newIndex], newTracks[index]];
     setTracks(newTracks);
-    try { await api.reorderTracks(selectedProgram!, newTracks.map(t => t.id)); }
+    // Only the moved section is renumbered. Sending the whole program would hit
+    // the 50-id reorder cap as soon as a program grows past a few sections.
+    const section = groupKeyOf(newTracks[index]!);
+    const sectionIds = newTracks.filter((t) => groupKeyOf(t) === section).map((t) => t.id);
+    try { await api.reorderTracks(selectedProgram!, sectionIds); }
     catch { loadTracks(selectedProgram!); }
   };
 
   const startEditTrack = (track: Track) => {
     setEditingTrackId(track.id);
-    setEditForm({ title: track.title, artist: track.artist || '', album: track.album || '', track_type: track.track_type ?? '' });
+    setEditForm({ title: track.title, artist: track.artist || '', album: track.album || '', group_name: track.group_name || '', track_type: track.track_type ?? '' });
   };
 
   const saveEditTrack = async (id: string) => {
@@ -320,6 +359,39 @@ export default function ProgramsPage() {
       toast.success('Track updated');
     } catch (err: unknown) {
       toast.error(errorMessage(err, 'Failed to update track'));
+    }
+  };
+
+  const trackGroups = groupTracks(tracks);
+  const showGroupHeaders = trackGroups.some((group) => group.name !== null);
+  // Ungrouped tracks are pinned first (the backend keeps them at group_order
+  // 0), so only named sections can be moved.
+  const namedGroups = trackGroups.filter((group) => group.name !== null);
+
+  const moveGroup = async (key: string, direction: 'up' | 'down') => {
+    if (!selectedProgram) return;
+    const index = namedGroups.findIndex((group) => group.key === key);
+    if (index < 0) return;
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= namedGroups.length) return;
+    const ordered = [...namedGroups];
+    [ordered[index], ordered[newIndex]] = [ordered[newIndex]!, ordered[index]!];
+    // Rebuild the flat list so `groupTracks` sees the sections in their new
+    // order; ungrouped tracks stay pinned at the front. `group_order` is
+    // rewritten too so the local rows match what the API will store.
+    const ungrouped = trackGroups.find((group) => group.name === null);
+    setTracks([
+      ...(ungrouped?.tracks ?? []).map((track) => ({ ...track, group_order: 0 })),
+      ...ordered.flatMap((group, position) =>
+        group.tracks.map((track) => ({ ...track, group_order: position + 1 }))
+      ),
+    ]);
+    try {
+      const result = await api.reorderTrackGroups(selectedProgram, ordered.map((group) => group.name!));
+      // The server may append a group this view did not know about.
+      if (result.groups.length !== ordered.length) loadTracks(selectedProgram);
+    } catch {
+      loadTracks(selectedProgram);
     }
   };
 
@@ -402,14 +474,32 @@ export default function ProgramsPage() {
                 </label>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              {isSuperAdmin && selectedTrackIds.length > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    value={bulkGroup}
+                    onChange={(e) => setBulkGroup(e.target.value)}
+                    maxLength={120}
+                    placeholder="Group / Book"
+                    aria-label="Group for selected tracks"
+                    className="px-2.5 py-2 w-32 dark:bg-dark-600 bg-white border dark:border-white/5 border-dark-300 rounded-lg dark:text-white text-dark-900 text-xs focus:outline-none focus:ring-2 focus:ring-primary-600"
+                  />
+                  <button onClick={assignGroupToSelected}
+                    title="Leave the field empty to clear the group"
+                    className="px-3 py-2 dark:bg-dark-500 bg-light-300 dark:hover:bg-dark-400 hover:bg-light-400 dark:text-white text-dark-900 text-xs font-medium rounded-lg transition-all">
+                    Set group
+                  </button>
+                </div>
+              )}
               {isSuperAdmin && selectedTrackIds.length > 0 && (
                 <button onClick={deleteSelectedTracks}
                   className="flex items-center gap-2 px-3 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-lg transition-all">
                   <Trash2 size={14} /> Delete ({selectedTrackIds.length})
                 </button>
               )}
-              <button onClick={() => { setTrackForm({ title: '', artist: '', album: '', track_type: 'episode' }); setTrackFile(null); setShowUploadTrack(true); }}
+              <button onClick={() => { setTrackForm({ title: '', artist: '', album: '', group_name: '', track_type: 'episode' }); setTrackFile(null); setShowUploadTrack(true); }}
                 className="flex items-center gap-2 px-3 py-2 dark:bg-dark-500 bg-light-300 dark:hover:bg-dark-400 hover:bg-light-400 dark:text-white text-dark-900 text-xs font-medium rounded-lg transition-all">
                 <FileAudio size={14} /> Single Upload
               </button>
@@ -422,69 +512,116 @@ export default function ProgramsPage() {
           {tracks.length === 0 ? (
             <p className="text-sm dark:text-dark-300 text-dark-500 py-8 text-center">No tracks yet. Upload some!</p>
           ) : (
-            <div className="space-y-1">
-              {tracks.map((t, i) => (
-                <div key={t.id} className={`flex items-center gap-2 p-2.5 rounded-lg transition-colors ${
-                  currentTrack?.id === t.id ? 'bg-primary-600/10' : 'dark:hover:bg-dark-500/50 hover:bg-light-300/50'
-                }`}>
-                  {isSuperAdmin && (
-                    <input type="checkbox" checked={selectedTrackIds.includes(t.id)}
-                      onChange={() => toggleTrackSelection(t.id)} aria-label={`Select track ${t.title}`}
-                      className="rounded dark:border-white/10 border-dark-300 flex-shrink-0 cursor-pointer" />
-                  )}
-                  {/* min-w-0 lets the title cell shrink so `truncate` works; without
-                      it a long title pushes the row wider than the viewport. */}
-                  <div className="flex flex-col gap-0">
-                    <button onClick={() => moveTrack(i, 'up')} disabled={i === 0}
-                      className="p-0.5 dark:text-dark-400 text-dark-500 dark:hover:text-white hover:text-dark-900 disabled:opacity-20 disabled:cursor-not-allowed"><ChevronUp size={13} /></button>
-                     <button onClick={() => moveTrack(i, 'down')} disabled={i === tracks.length - 1}
-                       className="p-0.5 dark:text-dark-400 text-dark-500 dark:hover:text-white hover:text-dark-900 disabled:opacity-20 disabled:cursor-not-allowed"><ChevronDown size={13} /></button>
-                  </div>
-                  <button onClick={() => {
-                      if (currentTrack?.id === t.id && isPlaying) pause();
-                      else if (currentTrack?.id === t.id && !isPlaying) resume();
-                      else play(t, tracks);
-                    }}
-                    className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${
-                      currentTrack?.id === t.id && isPlaying ? 'bg-primary-600 text-white' : 'bg-primary-600/20 text-primary-400 hover:bg-primary-600 hover:text-white'
-                    }`}>
-                    {currentTrack?.id === t.id && isPlaying ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
-                  </button>
-                  <span className="text-[10px] dark:text-dark-400 text-dark-500 w-4 text-center">{i + 1}</span>
-
-                  {editingTrackId === t.id ? (
-                    <div className="flex-1 flex items-center gap-2 flex-wrap">
-                      <input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                        className="px-2 py-1 dark:bg-dark-600 bg-white dark:border-white/5 border-dark-300 rounded dark:text-white text-dark-900 text-xs w-36 min-w-0 flex-1 sm:flex-none focus:ring-1 focus:ring-primary-600" placeholder="Title" />
-                       <input value={editForm.artist} onChange={(e) => setEditForm({ ...editForm, artist: e.target.value })}
-                         className="px-2 py-1 dark:bg-dark-600 bg-white dark:border-white/5 border-dark-300 rounded dark:text-white text-dark-900 text-xs w-28 min-w-0 flex-1 sm:flex-none focus:ring-1 focus:ring-primary-600" placeholder="Artist" />
-                       <input value={editForm.album} onChange={(e) => setEditForm({ ...editForm, album: e.target.value })}
-                         className="px-2 py-1 dark:bg-dark-600 bg-white dark:border-white/5 border-dark-300 rounded dark:text-white text-dark-900 text-xs w-28 min-w-0 flex-1 sm:flex-none focus:ring-1 focus:ring-primary-600" placeholder="Album" />
-                       <select value={editForm.track_type} onChange={(e) => setEditForm({ ...editForm, track_type: e.target.value })}
-                         className="px-2 py-1 dark:bg-dark-600 bg-white dark:border-white/5 border-dark-300 rounded dark:text-white text-dark-900 text-xs focus:ring-1 focus:ring-primary-600">
-                        <option value="episode">Episode</option>
-                        <option value="single">Single</option>
-                        <option value="mix">Mix</option>
-                        <option value="live">Live</option>
-                      </select>
-                      <button onClick={() => saveEditTrack(t.id)} className="p-1 text-green-400 hover:bg-green-500/15 rounded"><Check size={14} /></button>
-                      <button onClick={() => setEditingTrackId(null)} className="p-1 dark:text-dark-300 text-dark-500 dark:hover:bg-dark-500 hover:bg-light-300 rounded"><X size={14} /></button>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium dark:text-white text-dark-900 truncate">{t.title}</p>
-                         <p className="text-[11px] dark:text-dark-200 text-dark-600 truncate">{t.artist || 'Unknown'}{t.album ? ` · ${t.album}` : ''}</p>
-                      </div>
-                      <span className="text-[10px] dark:text-dark-300 text-dark-500 uppercase dark:bg-dark-600 bg-light-200 px-1.5 py-0.5 rounded hidden sm:block">{t.track_type}</span>
-                        <button aria-label={`Edit track ${t.title}`} title="Edit track" onClick={() => startEditTrack(t)} className="p-1 dark:text-dark-300 text-dark-500 hover:text-primary-400 transition-all"><Pencil size={13} /></button>
-                      {isSuperAdmin && (
-                        <button aria-label={`Delete track ${t.title}`} title="Delete track" onClick={() => deleteTrack(t.id)} className="p-1 dark:text-dark-300 text-dark-500 hover:text-red-400 transition-all"><Trash2 size={13} /></button>
+            <div className="space-y-4">
+              {trackGroups.map((group, groupIndex) => {
+                const groupKey = group.key || '__ungrouped';
+                const regionId = `admin-track-group-${groupIndex}`;
+                const isOpen = !showGroupHeaders || openGroups.has(groupKey);
+                return (
+                <div key={groupKey}>
+                  {showGroupHeaders && (
+                    <div className="flex items-center gap-1 mb-1.5">
+                      <h3 className="min-w-0 flex-1">
+                        <button type="button" onClick={() => toggleGroup(groupKey)}
+                          aria-expanded={isOpen} aria-controls={regionId}
+                          className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider dark:text-dark-200 text-dark-600 hover:text-primary-400 transition-colors">
+                          {isOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                          <span className="truncate">{group.name ?? 'Ungrouped'}</span>
+                          <span className="font-normal normal-case dark:text-dark-400 text-dark-500 flex-shrink-0">
+                            {group.tracks.length} {group.tracks.length === 1 ? 'track' : 'tracks'}
+                          </span>
+                        </button>
+                      </h3>
+                      {group.name !== null && (
+                        <div className="flex items-center gap-0.5 flex-shrink-0">
+                          <button type="button" onClick={() => moveGroup(groupKey, 'up')}
+                            disabled={namedGroups[0]?.key === groupKey}
+                            aria-label={`Move ${group.name} up`} title="Move group up"
+                            className="p-0.5 dark:text-dark-400 text-dark-500 dark:hover:text-white hover:text-dark-900 disabled:opacity-20 disabled:cursor-not-allowed">
+                            <ChevronUp size={13} />
+                          </button>
+                          <button type="button" onClick={() => moveGroup(groupKey, 'down')}
+                            disabled={namedGroups[namedGroups.length - 1]?.key === groupKey}
+                            aria-label={`Move ${group.name} down`} title="Move group down"
+                            className="p-0.5 dark:text-dark-400 text-dark-500 dark:hover:text-white hover:text-dark-900 disabled:opacity-20 disabled:cursor-not-allowed">
+                            <ChevronDown size={13} />
+                          </button>
+                        </div>
                       )}
-                    </>
+                    </div>
+                  )}
+                  {isOpen && (
+                  <div id={regionId} className="space-y-1">
+                    {group.tracks.map((t, i) => (
+                      <div key={t.id} className={`flex items-center gap-2 p-2.5 rounded-lg transition-colors ${
+                        currentTrack?.id === t.id ? 'bg-primary-600/10' : 'dark:hover:bg-dark-500/50 hover:bg-light-300/50'
+                      }`}>
+                        {isSuperAdmin && (
+                          <input type="checkbox" checked={selectedTrackIds.includes(t.id)}
+                            onChange={() => toggleTrackSelection(t.id)} aria-label={`Select track ${t.title}`}
+                            className="rounded dark:border-white/10 border-dark-300 flex-shrink-0 cursor-pointer" />
+                        )}
+                        {/* min-w-0 lets the title cell shrink so `truncate` works; without
+                            it a long title pushes the row wider than the viewport. */}
+                        <div className="flex flex-col gap-0">
+                          <button onClick={() => moveTrack(t.id, 'up')} disabled={i === 0}
+                            className="p-0.5 dark:text-dark-400 text-dark-500 dark:hover:text-white hover:text-dark-900 disabled:opacity-20 disabled:cursor-not-allowed"><ChevronUp size={13} /></button>
+                           <button onClick={() => moveTrack(t.id, 'down')} disabled={i === group.tracks.length - 1}
+                             className="p-0.5 dark:text-dark-400 text-dark-500 dark:hover:text-white hover:text-dark-900 disabled:opacity-20 disabled:cursor-not-allowed"><ChevronDown size={13} /></button>
+                        </div>
+                        <button onClick={() => {
+                            if (currentTrack?.id === t.id && isPlaying) pause();
+                            else if (currentTrack?.id === t.id && !isPlaying) resume();
+                            else play(t, tracks);
+                          }}
+                          className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${
+                            currentTrack?.id === t.id && isPlaying ? 'bg-primary-600 text-white' : 'bg-primary-600/20 text-primary-400 hover:bg-primary-600 hover:text-white'
+                          }`}>
+                          {currentTrack?.id === t.id && isPlaying ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
+                        </button>
+                        <span className="text-[10px] dark:text-dark-400 text-dark-500 w-4 text-center">{i + 1}</span>
+
+                        {editingTrackId === t.id ? (
+                          <div className="flex-1 flex items-center gap-2 flex-wrap">
+                            <input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                              className="px-2 py-1 dark:bg-dark-600 bg-white dark:border-white/5 border-dark-300 rounded dark:text-white text-dark-900 text-xs w-36 min-w-0 flex-1 sm:flex-none focus:ring-1 focus:ring-primary-600" placeholder="Title" />
+                             <input value={editForm.artist} onChange={(e) => setEditForm({ ...editForm, artist: e.target.value })}
+                               className="px-2 py-1 dark:bg-dark-600 bg-white dark:border-white/5 border-dark-300 rounded dark:text-white text-dark-900 text-xs w-28 min-w-0 flex-1 sm:flex-none focus:ring-1 focus:ring-primary-600" placeholder="Artist" />
+                             <input value={editForm.album} onChange={(e) => setEditForm({ ...editForm, album: e.target.value })}
+                               className="px-2 py-1 dark:bg-dark-600 bg-white dark:border-white/5 border-dark-300 rounded dark:text-white text-dark-900 text-xs w-28 min-w-0 flex-1 sm:flex-none focus:ring-1 focus:ring-primary-600" placeholder="Album" />
+                             <input value={editForm.group_name} onChange={(e) => setEditForm({ ...editForm, group_name: e.target.value })}
+                               maxLength={120}
+                               className="px-2 py-1 dark:bg-dark-600 bg-white dark:border-white/5 border-dark-300 rounded dark:text-white text-dark-900 text-xs w-28 min-w-0 flex-1 sm:flex-none focus:ring-1 focus:ring-primary-600" placeholder="Group" />
+                             <select value={editForm.track_type} onChange={(e) => setEditForm({ ...editForm, track_type: e.target.value })}
+                               className="px-2 py-1 dark:bg-dark-600 bg-white dark:border-white/5 border-dark-300 rounded dark:text-white text-dark-900 text-xs focus:ring-1 focus:ring-primary-600">
+                              <option value="episode">Episode</option>
+                              <option value="single">Single</option>
+                              <option value="mix">Mix</option>
+                              <option value="live">Live</option>
+                            </select>
+                            <button onClick={() => saveEditTrack(t.id)} className="p-1 text-green-400 hover:bg-green-500/15 rounded"><Check size={14} /></button>
+                            <button onClick={() => setEditingTrackId(null)} className="p-1 dark:text-dark-300 text-dark-500 dark:hover:bg-dark-500 hover:bg-light-300 rounded"><X size={14} /></button>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium dark:text-white text-dark-900 truncate">{t.title}</p>
+                               <p className="text-[11px] dark:text-dark-200 text-dark-600 truncate">{t.artist || 'Unknown'}{t.album ? ` · ${t.album}` : ''}</p>
+                            </div>
+                            <span className="text-[10px] dark:text-dark-300 text-dark-500 uppercase dark:bg-dark-600 bg-light-200 px-1.5 py-0.5 rounded hidden sm:block">{t.track_type}</span>
+                              <button aria-label={`Edit track ${t.title}`} title="Edit track" onClick={() => startEditTrack(t)} className="p-1 dark:text-dark-300 text-dark-500 hover:text-primary-400 transition-all"><Pencil size={13} /></button>
+                            {isSuperAdmin && (
+                              <button aria-label={`Delete track ${t.title}`} title="Delete track" onClick={() => deleteTrack(t.id)} className="p-1 dark:text-dark-300 text-dark-500 hover:text-red-400 transition-all"><Trash2 size={13} /></button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -623,11 +760,17 @@ export default function ProgramsPage() {
                    <input type="text" value={trackForm.artist} onChange={(e) => setTrackForm({ ...trackForm, artist: e.target.value })}
                      className="w-full px-3 py-2.5 dark:bg-dark-600 bg-white dark:border-white/5 border-dark-300 rounded-lg dark:text-white text-dark-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
                  </div>
-                 <div>
-                   <label className="block text-xs font-medium dark:text-dark-100 text-dark-700 mb-1.5">Album</label>
-                   <input type="text" value={trackForm.album} onChange={(e) => setTrackForm({ ...trackForm, album: e.target.value })}
-                     className="w-full px-3 py-2.5 dark:bg-dark-600 bg-white dark:border-white/5 border-dark-300 rounded-lg dark:text-white text-dark-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
-                 </div>
+                  <div>
+                    <label className="block text-xs font-medium dark:text-dark-100 text-dark-700 mb-1.5">Album</label>
+                    <input type="text" value={trackForm.album} onChange={(e) => setTrackForm({ ...trackForm, album: e.target.value })}
+                      className="w-full px-3 py-2.5 dark:bg-dark-600 bg-white dark:border-white/5 border-dark-300 rounded-lg dark:text-white text-dark-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
+                  </div>
+               </div>
+              <div className="mb-3">
+                <label className="block text-xs font-medium dark:text-dark-100 text-dark-700 mb-1.5">Group / Book</label>
+                <input type="text" value={trackForm.group_name} onChange={(e) => setTrackForm({ ...trackForm, group_name: e.target.value })}
+                  maxLength={120} placeholder="e.g. Matthew (optional)"
+                  className="w-full px-4 py-2.5 dark:bg-dark-600 bg-white dark:border-white/5 border-dark-300 rounded-lg dark:text-white text-dark-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600" />
               </div>
               <div className="mb-6">
                 <label className="block text-xs font-medium dark:text-dark-100 text-dark-700 mb-1.5">Type</label>

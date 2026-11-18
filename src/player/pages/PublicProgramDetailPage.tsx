@@ -3,13 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';import { usePlayer } from '../context/PlayerContext';
 import { usePlayerAuth } from '../context/AuthContext';
 import type { Comment, Program, Track } from '../utils/types';
+import { groupTracks } from '../utils/trackGroups';
 import { api } from '../utils/api';
 import { useAsyncData } from '../hooks/useAsyncData';
 import LoadError from '../components/LoadError';
 import CoverBg from '../components/CoverBg';
 import LikeButton from '../components/LikeButton';
 import { toast } from 'sonner';
-import { Play, Pause, Heart, Music, MessageCircle, Clock, ArrowLeft, Lock } from 'lucide-react';
+import { Play, Pause, Heart, Music, MessageCircle, Clock, ArrowLeft, Lock, ChevronDown, ChevronRight } from 'lucide-react';
 
 export default function PublicProgramDetailPage() {
   const { t } = useTranslation('programs');
@@ -25,6 +26,18 @@ export default function PublicProgramDetailPage() {
   const [comments, setComments] = useState<Comment[]>([]);
   // Which program the current `comments` belong to; '' until the first load.
   const [commentsFor, setCommentsFor] = useState('');
+  // Sections start collapsed: the page opens on the list of groups. Tracks with
+  // no label are still shown directly (there is nothing to collapse).
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
+  // A group name can repeat across programs, so clear the accordion state when
+  // the program changes instead of leaving a section open because the previous
+  // program had one with the same label. Adjusting state during render is the
+  // recommended pattern for this; doing it in an effect would cascade renders.
+  const [openGroupsFor, setOpenGroupsFor] = useState(programId);
+  if (openGroupsFor !== programId) {
+    setOpenGroupsFor(programId);
+    setOpenGroups(new Set());
+  }
 
   // `programId` is a dependency, so navigating from one program to another
   // reloads. The hook also drops a stale response that arrives after the id has
@@ -84,6 +97,25 @@ export default function PublicProgramDetailPage() {
 
   if (!program) return <p className="dark:text-dark-200 text-dark-600 text-center py-20">{t('programDetail.notFound')}</p>;
 
+  const trackGroups = groupTracks(program.tracks ?? []);
+  const showGroupHeaders = trackGroups.some((group) => group.name !== null);
+
+  const playGroup = (sectionTracks: Track[]) => {
+    const first = sectionTracks[0];
+    if (!first) return;
+    if (currentTrack?.id === first.id && !isPlaying) resume();
+    else play(first, sectionTracks);
+  };
+
+  const toggleGroup = (key: string) => {
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
   return (
     <div>
       <button onClick={onBack} className="text-sm dark:text-dark-200 text-dark-600 hover:text-primary-400 transition-colors mb-6 inline-flex items-center gap-1">
@@ -109,22 +141,53 @@ export default function PublicProgramDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
           <h3 className="text-sm font-semibold dark:text-dark-100 text-dark-700 uppercase tracking-wider mb-3">{t('programDetail.tracks')}</h3>
-          {program.tracks?.length === 0 ? (
+          {trackGroups.length === 0 ? (
             <div className="text-center py-12 glass-panel rounded-xl">
               <p className="dark:text-dark-300 text-dark-500">{t('programDetail.noTracks')}</p>
             </div>
           ) : (
-            <div className="space-y-2">
-              {program.tracks?.map((tr: Track, i: number) => (
-                <TrackRow key={tr.id} track={tr} index={i + 1}
-                  isActive={currentTrack?.id === tr.id}
-                  isPlaying={currentTrack?.id === tr.id && isPlaying}
-                  onPlay={() => {
-                    if (currentTrack?.id === tr.id && isPlaying) { pause(); }
-                    else if (currentTrack?.id === tr.id && !isPlaying) { resume(); }
-                    else { play(tr, program.tracks); }
-                  }} />
-              ))}
+            <div className="space-y-3">
+              {trackGroups.map((group, groupIndex) => {
+                const groupKey = group.key || '__ungrouped';
+                const regionId = `track-group-${groupIndex}`;
+                // With no named sections there is nothing to fold away.
+                const isOpen = !showGroupHeaders || openGroups.has(groupKey);
+                return (
+                  <section key={groupKey} className={showGroupHeaders ? 'glass-panel rounded-xl p-3' : ''}>
+                    {showGroupHeaders && (
+                      <div className="flex items-center justify-between gap-2">
+                        <button type="button" onClick={() => toggleGroup(groupKey)}
+                          aria-expanded={isOpen} aria-controls={regionId}
+                          className="flex-1 min-w-0 flex items-center gap-2 text-left dark:text-white text-dark-900 hover:text-primary-400 transition-colors">
+                          {isOpen ? <ChevronDown size={15} className="flex-shrink-0" /> : <ChevronRight size={15} className="flex-shrink-0" />}
+                          <span className="text-sm font-semibold truncate">{group.name ?? t('programDetail.ungrouped')}</span>
+                          <span className="text-[11px] font-normal dark:text-dark-400 text-dark-500 flex-shrink-0">
+                            ({group.tracks.length})
+                          </span>
+                        </button>
+                        <button type="button" onClick={() => playGroup(group.tracks)}
+                          className="inline-flex items-center gap-1 text-[11px] font-medium text-primary-400 hover:text-primary-300 transition-colors flex-shrink-0">
+                          <Play size={12} fill="currentColor" /> {t('programDetail.playGroup')}
+                        </button>
+                      </div>
+                    )}
+                    {isOpen && (
+                      <div id={regionId} className={showGroupHeaders ? 'space-y-2 mt-2' : 'space-y-2'}>
+                        {group.tracks.map((tr, i) => (
+                          <TrackRow key={tr.id} track={tr} index={i + 1}
+                            isActive={currentTrack?.id === tr.id}
+                            isPlaying={currentTrack?.id === tr.id && isPlaying}
+                            onPlay={() => {
+                              if (currentTrack?.id === tr.id && isPlaying) { pause(); }
+                              else if (currentTrack?.id === tr.id && !isPlaying) { resume(); }
+                              else { play(tr, program.tracks ?? [tr]); }
+                            }} />
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                );
+              })}
             </div>
           )}
         </div>

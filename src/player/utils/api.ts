@@ -228,6 +228,8 @@ export interface TrackUploadMeta {
   program_id: string;
   track_type?: string;
   duration?: number;
+  /** Optional section inside the program ("Matthew", "Genesis", …). */
+  group_name?: string | null;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -344,6 +346,7 @@ export async function uploadTrackResumable(
       program_id: meta.program_id,
       track_type: meta.track_type,
       duration: meta.duration,
+      group_name: meta.group_name,
     }),
   });
   onProgress(100);
@@ -399,6 +402,18 @@ export const api = {
     request<{ message: string }>(`/tracks/reorder/${programId}`, {
       method: 'PUT',
       body: JSON.stringify({ trackIds }),
+    }),
+  /** Assigns one section label to many tracks; `null` clears the group. */
+  assignTrackGroup: (trackIds: string[], groupName: string | null) =>
+    request<{ message: string; updated: number }>('/tracks/groups/assign', {
+      method: 'PUT',
+      body: JSON.stringify({ trackIds, group_name: groupName }),
+    }),
+  /** Reorders named sections; ungrouped tracks stay first. */
+  reorderTrackGroups: (programId: string, groups: string[]) =>
+    request<{ message: string; groups: string[] }>(`/tracks/groups/reorder/${programId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ groups }),
     }),
   bulkUploadTracks: (data: FormData, onProgress?: (percent: number) => void) =>
     formRequest<BulkUploadResult>('/tracks/bulk', data, 'POST', onProgress),

@@ -51,15 +51,32 @@ interface PlayerContextType {
 
 const PlayerContext = createContext<PlayerContextType>({} as PlayerContextType);
 
+const VOLUME_STORAGE_KEY = 'ydcs:volume';
+const DEFAULT_VOLUME = 0.8;
+
+/** Reads the listener's last chosen volume, falling back on any bad value. */
+function readStoredVolume(): number {
+  try {
+    const raw = localStorage.getItem(VOLUME_STORAGE_KEY);
+    const parsed = raw === null ? NaN : Number(raw);
+    return Number.isFinite(parsed) && parsed >= 0 && parsed <= 1 ? parsed : DEFAULT_VOLUME;
+  } catch {
+    return DEFAULT_VOLUME;
+  }
+}
+
 export function PlayerProvider({ children }: { children: ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  // Set once Web Audio setup fails so it is not retried on every play(), which
+  // would leak contexts and re-trigger the same failure.
+  const audioContextFailedRef = useRef(false);
 
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [playlist, setPlaylist] = useState<Track[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [volume, setVolumeState] = useState(0.8);
+  const [volume, setVolumeState] = useState(readStoredVolume);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isSeeking, setIsSeeking] = useState(false);
@@ -158,8 +175,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const initAudioContext = useCallback(() => {
-    if (!audioContextRef.current && audioRef.current) {
-      const ctx = new AudioContext();
+    if (audioContextRef.current || !audioRef.current || audioContextFailedRef.current) return;
+    let ctx: AudioContext | null = null;
+    try {
+      ctx = new AudioContext();
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 256;
       analyser.smoothingTimeConstant = 0.8;
@@ -170,6 +189,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       audioContextRef.current = ctx;
       sourceRef.current = source;
       setAnalyserNode(analyser);
+    } catch (err) {
+      // Without Web Audio there is no visualiser, but the element is still
+      // connected to its own output, so playback must not be lost over it.
+      audioContextFailedRef.current = true;
+      if (ctx) void ctx.close().catch(() => {});
+      console.warn('Audio analyser unavailable; continuing without visualiser:', err);
     }
   }, []);
 
@@ -463,8 +488,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, [animateProgressTo]);
 
   const setVolume = useCallback((vol: number) => {
-    setVolumeState(vol);
-    if (audioRef.current) audioRef.current.volume = vol;
+    const clamped = Math.min(1, Math.max(0, vol));
+    setVolumeState(clamped);
+    if (audioRef.current) audioRef.current.volume = clamped;
+    try {
+      localStorage.setItem(VOLUME_STORAGE_KEY, String(clamped));
+    } catch {
+      // Private mode / storage disabled: the in-memory volume still works.
+    }
   }, []);
 
   /**

@@ -37,6 +37,10 @@ export interface Track {
   program_id: string;
   track_type?: string | null;
   sort_order?: number;
+  /** Optional section inside a program ("Matthew", "Genesis", …). */
+  group_name?: string | null;
+  /** Display position of the section; ungrouped tracks use 0. */
+  group_order?: number;
   created_by?: string;
   creator_name?: string;
   created_at?: string;
@@ -78,6 +82,8 @@ export interface TrackUpdateInput {
   album?: string | null;
   track_type?: string;
   duration?: number;
+  /** An empty string clears the section; omit to leave it unchanged. */
+  group_name?: string | null;
 }
 
 export interface Leader {

@@ -52,12 +52,16 @@ export function ContactPage(): React.ReactElement {
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
+  // `website` is a honeypot: hidden below with CSS and tabindex -1, so a human
+  // never fills it but a bot that submits every input does. The server drops
+  // the message and reports success whenever it arrives non-empty.
+  const [form, setForm] = useState({ name: "", email: "", subject: "", message: "", website: "" });
 
   const contactInfo = t("contact.info", { returnObjects: true }) as Array<{ label: string; value: string; sub: string }>;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
     setError("");
   };
 
@@ -196,7 +200,7 @@ export function ContactPage(): React.ReactElement {
                     </div>
                     <h3 className="mt-8 font-serif text-4xl text-foreground">{t("contact.form.successTitle")}</h3>
                     <p className="mt-4 max-w-sm text-muted-foreground">{t("contact.form.successDesc")}</p>
-                    <button type="button" onClick={() => { setSent(false); setForm({ name: "", email: "", subject: "", message: "" }); }} className="mt-8 inline-flex items-center justify-center gap-2 rounded-full bg-gold px-10 py-3.5 text-sm font-semibold text-gold-foreground shadow-[var(--shadow-gold)] transition-all duration-300 hover:scale-105 hover:shadow-[0_15px_50px_-12px_oklch(0.72_0.13_75_/_0.6)]">
+                    <button type="button" onClick={() => { setSent(false); setForm({ name: "", email: "", subject: "", message: "", website: "" }); }} className="mt-8 inline-flex items-center justify-center gap-2 rounded-full bg-gold px-10 py-3.5 text-sm font-semibold text-gold-foreground shadow-[var(--shadow-gold)] transition-all duration-300 hover:scale-105 hover:shadow-[0_15px_50px_-12px_oklch(0.72_0.13_75_/_0.6)]">
                       {t("contact.form.ok")}
                     </button>
                   </div>
@@ -222,6 +226,22 @@ export function ContactPage(): React.ReactElement {
                     <div className="mt-5">
                       <label className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">{t("contact.form.message")}</label>
                       <textarea required rows={5} name="message" placeholder={t("contact.form.placeholders.message")} value={form.message} onChange={handleChange} className="mt-3 w-full rounded-xl border border-border bg-background px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/50 transition-all duration-300 focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/20 focus:shadow-[0_0_0_4px_oklch(0.72_0.13_75_/_0.08)]" />
+                    </div>
+                    {/* Honeypot for bots. Moved off-screen rather than
+                        `hidden`, because some bots skip display:none fields;
+                        it is out of the tab order and autofill so a person
+                        never fills it. */}
+                    <div aria-hidden="true" className="absolute left-[-9999px] top-auto h-px w-px overflow-hidden">
+                      <label htmlFor="contact-website">Website</label>
+                      <input
+                        id="contact-website"
+                        type="text"
+                        name="website"
+                        tabIndex={-1}
+                        autoComplete="off"
+                        value={form.website}
+                        onChange={handleChange}
+                      />
                     </div>
                     <button type="submit" disabled={loading} className="mt-8 inline-flex w-full items-center justify-center gap-3 rounded-full bg-gradient-to-r from-gold to-[oklch(0.65_0.15_60)] px-8 py-4 text-sm font-semibold text-gold-foreground shadow-[var(--shadow-gold)] transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_15px_50px_-12px_oklch(0.72_0.13_75_/_0.55)] disabled:opacity-50 disabled:hover:scale-100 sm:w-auto">
                       {loading ? (

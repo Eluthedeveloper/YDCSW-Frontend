@@ -13,7 +13,7 @@ const PER_FILE_RETRIES = 2;
 
 interface BulkItem {
   file: File;
-  meta: { title: string; artist: string; album: string };
+  meta: { title: string; artist: string; album: string; group: string };
 }
 
 interface Props {
@@ -40,6 +40,8 @@ export default function BulkUploadModal({ programId, onUploaded }: Props) {
   const [files, setFiles] = useState<BulkItem[]>([]);
   const [detecting, setDetecting] = useState(false);
   const [trackType, setTrackType] = useState('episode');
+  // Applies to every selected file until a row's own group is edited.
+  const [batchGroup, setBatchGroup] = useState('');
   const [uploading, setUploading] = useState(false);
   // Overall byte progress across the whole batch, 0-100.
   const [percent, setPercent] = useState(0);
@@ -47,6 +49,7 @@ export default function BulkUploadModal({ programId, onUploaded }: Props) {
 
   const reset = () => {
     setFiles([]);
+    setBatchGroup('');
     setPercent(0);
     setCurrentLabel(null);
   };
@@ -69,10 +72,15 @@ export default function BulkUploadModal({ programId, onUploaded }: Props) {
     setDetecting(true);
     const items: BulkItem[] = [];
     for (const file of capped) {
-      items.push({ file, meta: await readAudioMetadata(file) });
+      items.push({ file, meta: { ...(await readAudioMetadata(file)), group: batchGroup } });
     }
     setFiles(items);
     setDetecting(false);
+  };
+
+  const applyBatchGroup = (value: string) => {
+    setBatchGroup(value);
+    setFiles((prev) => prev.map((item) => ({ ...item, meta: { ...item.meta, group: value } })));
   };
 
   const updateMeta = (index: number, field: keyof BulkItem['meta'], value: string) => {
@@ -112,6 +120,7 @@ export default function BulkUploadModal({ programId, onUploaded }: Props) {
               album: item.meta.album,
               program_id: programId,
               track_type: trackType,
+              group_name: item.meta.group.trim() || null,
             },
             (filePercent) => {
               const fileBytes = item.file.size * (filePercent / 100);
@@ -217,7 +226,7 @@ export default function BulkUploadModal({ programId, onUploaded }: Props) {
 
           {files.length > 0 && (
             <>
-              <div className="mb-4">
+              <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <select
                   value={trackType}
                   onChange={(e) => setTrackType(e.target.value)}
@@ -228,6 +237,16 @@ export default function BulkUploadModal({ programId, onUploaded }: Props) {
                   <option value="sermon">Sermon</option>
                   <option value="music">Music</option>
                 </select>
+                <input
+                  type="text"
+                  value={batchGroup}
+                  onChange={(e) => applyBatchGroup(e.target.value)}
+                  disabled={uploading}
+                  placeholder="Group / Book (all files)"
+                  aria-label="Group for all files"
+                  maxLength={120}
+                  className="px-4 py-2.5 dark:bg-dark-600 bg-white border dark:border-white/5 border-dark-300 rounded-lg dark:text-white text-dark-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600"
+                />
               </div>
 
               <p className="text-xs dark:text-dark-200 text-dark-600 mb-2">
@@ -249,14 +268,16 @@ export default function BulkUploadModal({ programId, onUploaded }: Props) {
                         <X size={14} />
                       </button>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      {(['title', 'artist', 'album'] as const).map((field) => (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {(['title', 'artist', 'album', 'group'] as const).map((field) => (
                         <input
                           key={field}
                           type="text"
                           value={item.meta[field]}
-                          placeholder={field}
+                          placeholder={field === 'group' ? 'Group / Book' : field}
+                          aria-label={`${field} for ${item.file.name}`}
                           disabled={uploading}
+                          maxLength={field === 'group' ? 120 : undefined}
                           onChange={(e) => updateMeta(i, field, e.target.value)}
                           className="px-3 py-2 dark:bg-dark-600 bg-white border dark:border-white/5 border-dark-300 rounded-lg dark:text-white text-dark-900 text-xs focus:outline-none focus:ring-2 focus:ring-primary-600"
                         />
