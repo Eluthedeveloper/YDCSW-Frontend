@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePlayerAuth } from '../context/AuthContext';
-import { LogOut, Users, Music, FolderOpen, ChevronDown, BarChart3, Headphones, ExternalLink, MessageCircle, UserCog, Menu, Globe, Newspaper } from 'lucide-react';
+import { LogOut, Users, Music, FolderOpen, ChevronDown, BarChart3, Headphones, ExternalLink, MessageCircle, UserCog, Menu, Globe, Newspaper, Bot } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 
 interface SidebarProps {
@@ -28,6 +28,7 @@ export default function Sidebar({ activePage, collapsed, onToggleCollapse }: Sid
     { id: 'blog', label: 'Blog', icon: Newspaper },
     { id: 'comments', label: 'Comments', icon: MessageCircle },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'chatbot', label: 'Chatbot', icon: Bot },
     ...(user?.role === 'super_admin' ? [
       { id: 'users', label: 'Users', icon: Users },
       { id: 'account', label: 'Account', icon: UserCog },

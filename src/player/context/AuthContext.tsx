@@ -9,6 +9,8 @@ interface AuthContextType {
   isChecking: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  /** Applies a server-returned user after an account update. */
+  updateUser: (user: AuthUser) => void;
   isSuperAdmin: boolean;
 }
 
@@ -60,7 +62,7 @@ export function PlayerAuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, isChecking, login, logout, isSuperAdmin: user?.role === 'super_admin' }}>
+    <AuthContext.Provider value={{ user, isChecking, login, logout, updateUser: setUser, isSuperAdmin: user?.role === 'super_admin' }}>
       {children}
     </AuthContext.Provider>
   );

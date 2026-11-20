@@ -9,13 +9,14 @@ import { isStreamHost } from '../lib/hosts';
 /**
  * Floating visitor assistant.
  *
- * The component never talks to Gemini directly: it posts the conversation to
- * `/api/chat`, which holds the API key and the organisation knowledge. Mounted
+ * Talks only to the local `/api/chatbot` endpoints. Answers come from the
+ * database-backed knowledge base, so no API key or model is involved. Mounted
  * once in the app shell so a conversation survives page navigation, and hidden
  * on the admin screens where it would only get in the way.
  */
 
 type Role = 'user' | 'assistant';
+type ChatLang = 'en' | 'am' | 'om';
 
 interface ChatMessage {
   id: string;
@@ -26,13 +27,36 @@ interface ChatMessage {
 // Mirrors the server's limits. Trimming here too means an over-long paste is
 // caught instantly instead of after a round trip.
 const MAX_MESSAGE_CHARS = 1500;
-const MAX_HISTORY = 12;
 
 function newId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
   }
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+const SESSION_KEY = 'yd-chat-session';
+const LANGS: Array<{ code: ChatLang; label: string }> = [
+  { code: 'en', label: 'English' },
+  { code: 'am', label: 'አማርኛ' },
+  { code: 'om', label: 'Afaan Oromo' },
+];
+
+function initialSession(): string {
+  try {
+    const stored = sessionStorage.getItem(SESSION_KEY);
+    if (stored) return stored;
+    const id = newId();
+    sessionStorage.setItem(SESSION_KEY, id);
+    return id;
+  } catch {
+    return newId();
+  }
+}
+
+function initialLang(current: string | undefined): ChatLang {
+  const base = (current ?? 'en').split('-')[0];
+  return base === 'am' || base === 'om' ? base : 'en';
 }
 
 /**
@@ -122,6 +146,9 @@ export default function ChatBot() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+  const [sessionId, setSessionId] = useState(initialSession);
+  const [lang, setLang] = useState<ChatLang>(() => initialLang(i18n.language));
+  const [remoteSuggestions, setRemoteSuggestions] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -129,7 +156,10 @@ export default function ChatBot() {
   // before React has rendered the disabled button.
   const sendingRef = useRef(false);
 
-  const suggestions = t('chat.suggestions', { returnObjects: true }) as unknown as string[];
+  const fallbackSuggestions = t('chat.suggestions', { returnObjects: true }) as unknown as string[];
+  const suggestions = remoteSuggestions.length > 0
+    ? remoteSuggestions
+    : Array.isArray(fallbackSuggestions) ? fallbackSuggestions : [];
 
   useEffect(() => {
     if (!open) return;
@@ -147,6 +177,26 @@ export default function ChatBot() {
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/chatbot/suggestions?lang=${encodeURIComponent(lang)}`, {
+          signal: controller.signal,
+        });
+        if (!res?.ok) return;
+        const data = await res.json() as { suggestions?: unknown };
+        if (Array.isArray(data.suggestions)) {
+          setRemoteSuggestions(data.suggestions.filter((item): item is string => typeof item === 'string' && !!item.trim()));
+        }
+      } catch {
+        setRemoteSuggestions([]);
+      }
+    })();
+    return () => controller.abort();
+  }, [open, lang]);
 
   useEffect(() => {
     const node = scrollRef.current;
@@ -168,9 +218,8 @@ export default function ChatBot() {
       }
 
       const userMessage: ChatMessage = { id: newId(), role: 'user', text };
-      const history = [...messages, userMessage].slice(-MAX_HISTORY);
 
-      setMessages(history);
+      setMessages((prev) => [...prev, userMessage]);
       setInput('');
       setError('');
       setSending(true);
@@ -178,17 +227,17 @@ export default function ChatBot() {
 
       const controller = new AbortController();
       abortRef.current = controller;
+      let timedOut = false;
+      const timer = window.setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+      }, 20_000);
 
       try {
-        const res = await fetch(`${API_BASE}/chat`, {
+        const res = await fetch(`${API_BASE}/chatbot/message`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            messages: history.map((m) => ({ role: m.role, text: m.text })),
-            // The server understands "en", "am" and "om"; a regional tag from
-            // a stored preference ("am-ET") is reduced to its base language.
-            lang: i18n.language.split('-')[0],
-          }),
+          body: JSON.stringify({ sessionId, message: text, lang }),
           signal: controller.signal,
         });
 
@@ -204,9 +253,16 @@ export default function ChatBot() {
           { id: newId(), role: 'assistant', text: String(data.reply) },
         ]);
       } catch (err) {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted) {
+          // A reset aborts deliberately and owns its own state. Only a timeout
+          // should surface an error; without this the spinner would vanish and
+          // the visitor would be left with no answer and no explanation.
+          if (timedOut) setError(t('chat.errorTimeout'));
+          return;
+        }
         setError(err instanceof TypeError ? t('chat.errorOffline') : t('chat.errorGeneric'));
       } finally {
+        window.clearTimeout(timer);
         // A reset or a newer send may already own the state; only the request
         // that is still current may clear it.
         if (abortRef.current === controller) {
@@ -216,18 +272,29 @@ export default function ChatBot() {
         }
       }
     },
-    [i18n.language, input, messages, t]
+    [input, lang, sessionId, t]
   );
 
   const reset = () => {
     abortRef.current?.abort();
     abortRef.current = null;
     sendingRef.current = false;
+    const fresh = newId();
+    setSessionId(fresh);
+    try {
+      sessionStorage.setItem(SESSION_KEY, fresh);
+    } catch {
+      // Private browsing can reject storage; the in-memory session still works.
+    }
     setMessages([]);
     setInput('');
     setError('');
     setSending(false);
     inputRef.current?.focus();
+  };
+
+  const changeLang = (next: ChatLang) => {
+    setLang(next);
   };
 
   // Admin screens have their own workflows and no reason to offer visitor Q&A.
@@ -261,6 +328,20 @@ export default function ChatBot() {
               <p className="mt-0.5 truncate text-xs text-background/70">{t('chat.subtitle')}</p>
             </div>
             <div className="flex shrink-0 items-center gap-1">
+              <label htmlFor="chat-lang" className="sr-only">{t('chat.language')}</label>
+              <select
+                id="chat-lang"
+                value={lang}
+                onChange={(event) => changeLang(event.target.value as ChatLang)}
+                title={t('chat.language')}
+                className="rounded-full border border-white/20 bg-white/10 px-2 py-1 text-[11px] text-background outline-none transition hover:bg-white/20"
+              >
+                {LANGS.map((item) => (
+                  <option key={item.code} value={item.code} className="text-dark-900">
+                    {item.label}
+                  </option>
+                ))}
+              </select>
               {messages.length > 0 && (
                 <button
                   type="button"

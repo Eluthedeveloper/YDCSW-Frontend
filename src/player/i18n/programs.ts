@@ -64,6 +64,8 @@ export const programsEn = {
     searchHint: "Search by title, artist, or album",
     unknown: "Unknown",
     tracksSuffix: "tracks",
+    failed: "Search failed. Please check your connection.",
+    retry: "Retry",
   },
   player: {
     title: "Player",
@@ -187,6 +189,8 @@ export const programsAm: typeof programsEn = {
     searchHint: "በርዕስ፣ በአርቲስት ወይም በአልበም ይፈልጉ",
     unknown: "አልታወቀም",
     tracksSuffix: "ትራኮች",
+    failed: "ፍለጋው አልተሳካም። እባክዎ ግንኙነትዎን ይመልከቱ።",
+    retry: "እንደገና ሞክር",
   },
   player: {
     title: "መጫወቻ",
@@ -314,6 +318,8 @@ export const programsOm: typeof programsEn = {
     searchHint: "Mata dureen, artistiin, ykn albamiin barbaadi",
     unknown: "Hin beekamne",
     tracksSuffix: "traakiiwwan",
+    failed: "Barbaaduun hin milkoofne. Maaloo qunnamtii keessan ilaalaa.",
+    retry: "Irra deebi'i",
   },
   player: {
     title: "Taphachiisaa",

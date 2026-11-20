@@ -1,6 +1,6 @@
 // src/components/NotificationBell.tsx
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Bell, Newspaper, Megaphone, CalendarDays, CheckCheck, Sparkles } from "lucide-react";
 import { api, uploadUrl } from "../player/utils/api";
@@ -68,6 +68,7 @@ interface Props {
 export default function NotificationBell({ variant = 'navy', className = '' }: Props) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const [items, setItems] = useState<WhatsNewItem[]>([]);
   const [open, setOpen] = useState(false);
   const [seenAt, setSeenAt] = useState<number>(() => {
@@ -120,6 +121,27 @@ export default function NotificationBell({ variant = 'navy', className = '' }: P
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [open]);
+
+  useEffect(() => {
+    if (!location.hash) return;
+    const id = decodeURIComponent(location.hash.slice(1));
+    let attempts = 0;
+    let timer: number | undefined;
+
+    const scroll = () => {
+      const target = document.getElementById(id);
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth" });
+        return;
+      }
+      if (attempts++ < 20) timer = window.setTimeout(scroll, 100);
+    };
+
+    scroll();
+    return () => {
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [location.pathname, location.hash]);
 
   const markAllRead = useCallback(() => {
     const now = Date.now();

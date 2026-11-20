@@ -1,5 +1,5 @@
 // src/pages/home.tsx
-import React, { useState } from "react";
+import React from "react";
 import { Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
@@ -43,15 +43,12 @@ function Hero() {
           </Link>
         </div>
         <div className="mt-24 grid max-w-3xl grid-cols-2 gap-8 border-t border-background/15 pt-8 sm:grid-cols-4">
-          {[
-            [t("home.stats.lives")],
-            [t("home.stats.countries")],
-            [t("home.stats.years")],
-            [t("home.stats.radio")],
-          ].map(([label]) => (
-            <div key={label}>
-              <div className="font-serif text-3xl text-gold sm:text-4xl">{label.split(" ")[0]}</div>
-              <div className="mt-1 text-xs uppercase tracking-widest text-background/60">{label.split(" ").slice(1).join(" ")}</div>
+          {(Object.values(
+            t("home.stats", { returnObjects: true }) as Record<string, { value: string; label: string }>
+          )).map((stat) => (
+            <div key={stat.label}>
+              <div className="font-serif text-3xl text-gold sm:text-4xl">{stat.value}</div>
+              <div className="mt-1 text-xs uppercase tracking-widest text-background/60">{stat.label}</div>
             </div>
           ))}
         </div>
@@ -220,7 +217,7 @@ function RadioHighlight() {
 }
 
 /**
- * Homepage announcements and upcoming events, managed from the admin panel.
+ * Homepage announcements and events, managed from the admin panel.
  *
  * Each block renders only when it has content, and the whole section returns
  * null when neither exists — so a site with nothing published still shows the
@@ -241,17 +238,7 @@ function Notices() {
     { announcements: [] as Announcement[], events: [] as SiteEvent[] }
   );
 
-  // Frozen at mount: the filter below only needs "now" as an upper bound for
-  // ended events, and reading the clock during render is impure.
-  const [now] = useState(() => Date.now());
-  // Only events that have not finished yet; the API returns newest-dated
-  // first, so slicing keeps the soonest upcoming ones.
-  const upcoming = events
-    .filter((event) => {
-      const end = new Date((event.ends_at ?? event.starts_at).replace(" ", "T")).getTime();
-      return Number.isFinite(end) && end >= now;
-    })
-    .slice(0, 4);
+  const upcoming = events.slice(0, 4);
   const visibleAnnouncements = announcements.slice(0, 4);
 
   if (visibleAnnouncements.length === 0 && upcoming.length === 0) return null;
@@ -268,7 +255,7 @@ function Notices() {
       <div className="mx-auto max-w-7xl px-6 lg:px-12">
         <div className={`grid gap-12 ${visibleAnnouncements.length > 0 && upcoming.length > 0 ? "lg:grid-cols-2" : ""}`}>
           {visibleAnnouncements.length > 0 && (
-            <div>
+            <div id="announcements">
               <p className="text-xs uppercase tracking-[0.3em] text-gold">{t("home.notices.announcementsTag")}</p>
               <h2 className="mt-4 font-serif text-4xl text-foreground sm:text-5xl">{t("home.notices.announcementsTitle")}</h2>
               <div className="mt-8 space-y-4">
@@ -295,7 +282,7 @@ function Notices() {
           )}
 
           {upcoming.length > 0 && (
-            <div>
+            <div id="events">
               <p className="text-xs uppercase tracking-[0.3em] text-gold">{t("home.notices.eventsTag")}</p>
               <h2 className="mt-4 font-serif text-4xl text-foreground sm:text-5xl">{t("home.notices.eventsTitle")}</h2>
               <div className="mt-8 space-y-4">

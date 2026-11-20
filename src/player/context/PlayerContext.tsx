@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react';import type { ReactNode } from 'react';
+import { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react';
+import type { ReactNode } from 'react';
 import { api, trackStreamUrl } from '../utils/api';
 import type { Track } from '../utils/types';
 
@@ -97,6 +98,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const shuffleRef = useRef(shuffle);
   const repeatModeRef = useRef(repeatMode);
   const stallTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // A reconnect waits for `loadedmetadata` to restore the position. Keeping the
+  // listener here lets play()/close() remove it, so it can never fire against a
+  // different track and seek that one to the old position.
+  const reconnectRestoreRef = useRef<(() => void) | null>(null);
 
   // The media element listeners below are registered once on mount and need to
   // reach the current `play`, but registering them before `play` is declared
@@ -132,7 +137,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }, STALL_TIMEOUT_MS);
   }, [clearStallWatchdog]);
 
-
+  const clearReconnectRestore = useCallback(() => {
+    const audio = audioRef.current;
+    if (audio && reconnectRestoreRef.current) {
+      audio.removeEventListener('loadedmetadata', reconnectRestoreRef.current);
+    }
+    reconnectRestoreRef.current = null;
+  }, []);
   /**
    * Classifies a MediaError. Codes per the HTML spec: 1 aborted, 2 network,
    * 3 decode, 4 source unsupported. An aborted load is what `close()` and track
@@ -293,29 +304,35 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     pendingListenRef.current = track.id;
 
     if (audioRef.current) {
-      audioRef.current.src = trackStreamUrl(track.file_path);
-      audioRef.current.load();
+      const audio = audioRef.current;
+      clearReconnectRestore();
+      audio.src = trackStreamUrl(track.file_path);
+      audio.load();
       // A new source supersedes whatever went wrong with the last one.
       setPlaybackError(null);
       initAudioContext();
       if (audioContextRef.current?.state === 'suspended') {
         void audioContextRef.current.resume();
       }
-      audioRef.current.play()
+      const startedSrc = audio.src;
+      audio.play()
         .then(() => setIsPlaying(true))
         .catch((err: unknown) => {
           setIsPlaying(false);
           setIsBuffering(false);
           // A missing or unsupported source also fires the element's `error`
           // event, which sets the specific message (and runs the 404 check).
-          // Logging it here as well only duplicated that in the console.
-          if (err instanceof Error && err.name === 'NotSupportedError') return;
-          // What remains is an autoplay block, which the element cannot report.
+          // AbortError/NotAllowedError happen when another track replaces this
+          // one or the browser blocks autoplay, and are not real failures.
+          if (err instanceof Error && ['NotSupportedError', 'AbortError', 'NotAllowedError'].includes(err.name)) return;
+          // A slow rejection from a track the listener already left must not
+          // overwrite the current track's state.
+          if (audioRef.current?.src !== startedSrc) return;
           console.warn('Playback could not start:', err);
           setPlaybackError(classifyMediaError() ?? 'unknown');
         });
     }
-  }, [initAudioContext, classifyMediaError]);
+  }, [initAudioContext, classifyMediaError, clearReconnectRestore]);
 
   // Synced in an effect rather than assigned during render, which would be a
   // ref write in the render phase. The `ended` listener reads it only after
@@ -325,22 +342,28 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, [play]);
 
   const pause = useCallback(() => {
+    // Pausing while buffering must cancel the watchdog, or it fires 12s later
+    // and reports a network error for a pause the listener chose.
+    clearStallWatchdog();
     audioRef.current?.pause();
     setIsPlaying(false);
-  }, []);
+  }, [clearStallWatchdog]);
 
   const resume = useCallback(() => {
     if (audioRef.current) {
+      const audio = audioRef.current;
       initAudioContext();
       if (audioContextRef.current?.state === 'suspended') {
         void audioContextRef.current.resume();
       }
-      audioRef.current.play()
+      const startedSrc = audio.src;
+      audio.play()
         .catch((err: unknown) => {
           setIsBuffering(false);
           // Same treatment as play(): the element's `error` event covers a
           // missing/unsupported source, so only autoplay blocks need reporting.
-          if (err instanceof Error && err.name === 'NotSupportedError') return;
+          if (err instanceof Error && ['NotSupportedError', 'AbortError', 'NotAllowedError'].includes(err.name)) return;
+          if (audioRef.current?.src !== startedSrc) return;
           console.warn('Playback could not start:', err);
           setPlaybackError(classifyMediaError() ?? 'unknown');
         });
@@ -366,7 +389,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     // restore waits for `loadedmetadata` and is also attempted immediately in
     // case the browser already has it cached.
     const restore = () => {
+      if (reconnectRestoreRef.current === restore) reconnectRestoreRef.current = null;
       if (at <= 0) return;
+      // A different track may have replaced this source while we waited.
+      if (audioRef.current !== audio) return;
       try {
         audio.currentTime = at;
       } catch {
@@ -374,6 +400,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       }
     };
 
+    clearReconnectRestore();
+    reconnectRestoreRef.current = restore;
     audio.addEventListener('loadedmetadata', restore, { once: true });
     audio.src = trackStreamUrl(track.file_path);
     audio.load();
@@ -386,17 +414,25 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       .then(() => setIsPlaying(true))
       .catch((err: unknown) => {
         setIsPlaying(false);
-        if (err instanceof Error && err.name === 'NotSupportedError') return;
+        if (err instanceof Error && ['NotSupportedError', 'AbortError', 'NotAllowedError'].includes(err.name)) return;
+        if (audioRef.current !== audio) return;
         setPlaybackError(classifyMediaError() ?? 'unknown');
       });
-  }, [classifyMediaError, clearStallWatchdog]);
+  }, [classifyMediaError, clearStallWatchdog, clearReconnectRestore]);
 
   const close = useCallback(() => {
+    clearStallWatchdog();
+    clearReconnectRestore();
     if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      audioRef.current.removeAttribute('src');
-      audioRef.current.load();
+      const audio = audioRef.current;
+      audio.pause();
+      try {
+        audio.currentTime = 0;
+      } catch {
+        // No metadata yet; removing the source below is enough.
+      }
+      audio.removeAttribute('src');
+      audio.load();
     }
     setCurrentTrack(null);
     currentTrackRef.current = null;
@@ -407,10 +443,16 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setDuration(0);
     setIsBuffering(false);
     pendingListenRef.current = null;
-  }, []);
+  }, [clearStallWatchdog, clearReconnectRestore]);
 
   const seek = useCallback((time: number) => {
-    if (audioRef.current) audioRef.current.currentTime = time;
+    const audio = audioRef.current;
+    if (!audio) return;
+    try {
+      audio.currentTime = time;
+    } catch {
+      return;
+    }
     setProgress(time);
   }, []);
 
@@ -474,7 +516,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const from = audio.currentTime;
     const limit = upperBound(audio);
     const to = limit === null ? from + seconds : Math.min(limit, from + seconds);
-    audio.currentTime = to;
+    try {
+      audio.currentTime = to;
+    } catch {
+      return;
+    }
     animateProgressTo(from, to);
   }, [animateProgressTo, upperBound]);
 
@@ -483,7 +529,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (!audio) return;
     const from = audio.currentTime;
     const to = Math.max(0, from - seconds);
-    audio.currentTime = to;
+    try {
+      audio.currentTime = to;
+    } catch {
+      return;
+    }
     animateProgressTo(from, to);
   }, [animateProgressTo]);
 

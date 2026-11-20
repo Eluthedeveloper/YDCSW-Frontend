@@ -4,7 +4,9 @@ import type {
   AuthUser, Comment, MeUpdateInput, CreateUserInput, Program,
   SearchResults, Track, TrackUpdateInput, UserRow,
   Leader, Album, Announcement, SiteEvent, BlogPost, WhatsNewItem, RadioSlot,
-  ShortwaveEntry,
+  ShortwaveEntry, ChatLang, ChatbotReply, ChatbotSettings, ChatbotKnowledge,
+  ChatbotInput, ChatbotIntent, ChatbotAnalytics, ChatbotConversation,
+  ChatbotMessage, ChatbotSyncSource,
 } from './types';
 
 export const uploadUrl = baseUploadUrl;
@@ -531,6 +533,49 @@ export const api = {
 
   recordListen: (trackId: string) =>
     request<{ success: boolean }>(`/public/tracks/${trackId}/listen`, withClientId()),
+
+  // ---- Chatbot ----
+
+  getChatSuggestions: (lang: ChatLang) =>
+    request<{ suggestions: string[] }>(`/chatbot/suggestions?lang=${encodeURIComponent(lang)}`),
+  sendChatMessage: (data: { sessionId: string; message: string; lang: ChatLang; restart?: boolean }) =>
+    request<ChatbotReply>('/chatbot/message', { method: 'POST', body: JSON.stringify(data) }),
+
+  getChatbotKnowledge: (filters: { lang?: ChatLang; intent?: string; search?: string } = {}) => {
+    const params = new URLSearchParams();
+    if (filters.lang) params.set('lang', filters.lang);
+    if (filters.intent) params.set('intent', filters.intent);
+    if (filters.search) params.set('search', filters.search);
+    const query = params.toString();
+    return request<ChatbotKnowledge[]>(`/admin/chatbot/knowledge${query ? `?${query}` : ''}`);
+  },
+  createChatbotKnowledge: (data: ChatbotInput) =>
+    request<{ id: string }>('/admin/chatbot/knowledge', { method: 'POST', body: JSON.stringify(data) }),
+  updateChatbotKnowledge: (id: string, data: Partial<ChatbotInput>) =>
+    request<{ id: string }>(`/admin/chatbot/knowledge/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  deleteChatbotKnowledge: (id: string) =>
+    request<{ message: string }>(`/admin/chatbot/knowledge/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  getChatbotIntents: () => request<ChatbotIntent[]>('/admin/chatbot/intents'),
+  getChatbotAnalytics: () => request<ChatbotAnalytics>('/admin/chatbot/analytics'),
+  getChatbotUnanswered: () =>
+    request<Array<ChatbotMessage & { language: string; session_id: string }>>('/admin/chatbot/unanswered'),
+  getChatbotConversations: () => request<ChatbotConversation[]>('/admin/chatbot/conversations'),
+  getChatbotConversation: (id: string) =>
+    request<{ conversation: ChatbotConversation; messages: ChatbotMessage[] }>(
+      `/admin/chatbot/conversations/${encodeURIComponent(id)}`
+    ),
+  getChatbotSettings: () => request<ChatbotSettings>('/admin/chatbot/settings'),
+  updateChatbotSettings: (data: Partial<ChatbotSettings>) =>
+    request<ChatbotSettings>('/admin/chatbot/settings', { method: 'PUT', body: JSON.stringify(data) }),
+  getChatbotSyncStatus: () => request<{ sources: ChatbotSyncSource[] }>('/admin/chatbot/sync/status'),
+  runChatbotSync: (table?: string) =>
+    request<{ synced: number }>('/admin/chatbot/sync/run', {
+      method: 'POST',
+      body: JSON.stringify(table ? { table } : {}),
+    }),
 };
 
 export interface MonthCount {

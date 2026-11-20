@@ -50,6 +50,7 @@ const PlayerUsersPage = lazy(() => import("./player/pages/UsersPage"));
 const PlayerAccountSettingsPage = lazy(() => import("./player/pages/AccountSettingsPage"));
 const PlayerSiteContentPage = lazy(() => import("./player/pages/SiteContentPage"));
 const PlayerBlogPage = lazy(() => import("./player/pages/BlogAdminPage"));
+const PlayerChatbotPage = lazy(() => import("./player/pages/ChatbotAdminPage"));
 
 /**
  * Shell shown while a split chunk loads. Styled to sit inside both the admin
@@ -82,6 +83,7 @@ const ADMIN_PAGES: Record<string, React.ReactNode> = {
   comments: <PlayerCommentsPage />,
   users: <PlayerUsersPage />,
   account: <PlayerAccountSettingsPage />,
+  chatbot: <PlayerChatbotPage />,
 };
 
 function PlayerAdminSite() {
@@ -108,7 +110,7 @@ function PlayerAdminSite() {
   // An empty segment is the bare /admin/player, handled by a redirect below.
   const isEditor = user.role === 'editor';
   const homePage = isEditor ? 'site' : 'programs';
-  const activePage = page && page in ADMIN_PAGES ? page : homePage;
+  const activePage = page && Object.prototype.hasOwnProperty.call(ADMIN_PAGES, page) ? page : homePage;
 
   if (isEditor && !EDITOR_PAGES.includes(activePage)) {
     return <Navigate to="/admin/player/site" replace />;
@@ -154,7 +156,12 @@ function ScrollToTop() {
     // scrolling to the top on those left the user at the top of the page they
     // asked to be scrolled down.
     if (hash) {
-      const id = decodeURIComponent(hash.slice(1));
+      let id = hash.slice(1);
+      try {
+        id = decodeURIComponent(id);
+      } catch {
+        // A malformed escape sequence in a URL must not break navigation.
+      }
       const target = document.getElementById(id);
       if (target) {
         target.scrollIntoView({ behavior: 'smooth', block: 'start' });

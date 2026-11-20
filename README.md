@@ -37,10 +37,14 @@ The backend still accepts `Authorization: Bearer` for non-browser clients.
 ## Visitor chatbot
 
 `src/components/ChatBot.tsx` is a floating assistant mounted once in `App.tsx`.
-It calls `POST /api/chat`, which holds the Gemini key server-side; nothing
-secret is present in the bundle. The widget is lazy-loaded, hides on `/admin`
-routes, stays above the collapsed player bar, and is translated into English,
-Amharic and Afaan Oromo through the `chat.*` keys in `src/i18n/locales`.
+It calls `POST /api/chatbot/message` and `GET /api/chatbot/suggestions`; answers
+come from the backend database, so no model key or generated text is present in
+the bundle. The widget is lazy-loaded, hides on `/admin` routes, keeps a
+session-scoped conversation, offers a language selector, and is translated into
+English, Amharic and Afaan Oromo through the `chat.*` keys in `src/i18n/locales`.
+
+Admins manage the knowledge base, analytics, conversations, settings and content
+sync at `/admin/player/chatbot` (`src/player/pages/ChatbotAdminPage.tsx`).
 
 ## Configuration
 

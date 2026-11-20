@@ -16,6 +16,8 @@ export default function PublicSearchPage() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<{ programs: Program[]; tracks: Track[] } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+  const [retryNonce, setRetryNonce] = useState(0);
   /** Last query whose results are displayed; '' means nothing searched yet. */
   const [committedQuery, setCommittedQuery] = useState('');
   const committedQueryRef = useRef('');
@@ -25,7 +27,13 @@ export default function PublicSearchPage() {
 
   useEffect(() => {
     const term = query.trim();
-    if (!term) return;
+    if (!term) {
+      // The input handler resets the visible state; the effect only cancels
+      // work so a pending request from a previous query cannot land later.
+      clearTimeout(timerRef.current ?? undefined);
+      committedQueryRef.current = '';
+      return;
+    }
 
     // Debounced so typing doesn't fire a request per keystroke. The pending
     // query lives in `pendingQuery` rather than local state, so the effect
@@ -35,12 +43,17 @@ export default function PublicSearchPage() {
     timerRef.current = setTimeout(() => {
       setCommittedQuery(term);
       committedQueryRef.current = term;
+      setLoading(true);
+      setError(false);
       api.search(term)
         .then((data) => {
           if (term === committedQueryRef.current) setResults(data);
         })
         .catch(() => {
-          if (term === committedQueryRef.current) setResults(null);
+          if (term === committedQueryRef.current) {
+            setResults(null);
+            setError(true);
+          }
         })
         .finally(() => {
           if (term === committedQueryRef.current) setLoading(false);
@@ -48,14 +61,27 @@ export default function PublicSearchPage() {
     }, 350);
 
     return () => clearTimeout(timerRef.current ?? undefined);
-  }, [query]);
+  }, [query, retryNonce]);
 
   const searching = query.trim() !== committedQuery || loading;
+
+  const onQueryChange = (value: string) => {
+    setQuery(value);
+    if (!value.trim()) {
+      clearTimeout(timerRef.current ?? undefined);
+      committedQueryRef.current = '';
+      setCommittedQuery('');
+      setResults(null);
+      setLoading(false);
+      setError(false);
+    }
+  };
 
   const clearSearch = () => {
     clearTimeout(timerRef.current ?? undefined);
     setQuery('');
     setResults(null);
+    setError(false);
     setCommittedQuery('');
     committedQueryRef.current = '';
     setLoading(false);
@@ -67,7 +93,7 @@ export default function PublicSearchPage() {
         <h1 className="text-3xl font-bold dark:text-white text-dark-900 mb-4">{t('search.title')}</h1>
         <div className="relative max-w-2xl">
           <SearchIcon size={18} className="absolute left-4 top-1/2 -translate-y-1/2 dark:text-dark-300 text-dark-500" />
-          <input type="text" value={query} onChange={(e) => setQuery(e.target.value)}
+          <input type="text" value={query} onChange={(e) => onQueryChange(e.target.value)}
             placeholder={t('search.placeholder')}
             className="w-full pl-11 pr-10 py-3.5 dark:bg-dark-600 bg-white border dark:border-white/5 border-dark-300 rounded-xl dark:text-white text-dark-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent placeholder:text-dark-300" />
           {query && (
@@ -81,6 +107,17 @@ export default function PublicSearchPage() {
 
       {searching ? (
         <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="glass-panel rounded-xl h-16 animate-pulse" />)}</div>
+      ) : error ? (
+        <div className="text-center py-16 glass-panel rounded-2xl">
+          <Music size={48} className="dark:text-dark-400 text-dark-500 mx-auto mb-3" />
+          <p className="dark:text-dark-200 text-dark-600 text-lg">{t('search.failed')}</p>
+          <button
+            onClick={() => setRetryNonce((n) => n + 1)}
+            className="mt-4 px-5 py-2.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium transition-colors"
+          >
+            {t('search.retry')}
+          </button>
+        </div>
       ) : results ? (
         <div>
           {results.programs.length === 0 && results.tracks.length === 0 ? (

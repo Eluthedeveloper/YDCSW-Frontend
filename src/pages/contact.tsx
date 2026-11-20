@@ -38,6 +38,12 @@ const icons: Record<string, React.ReactNode> = {
   Studioo: null,
 };
 
+function contactHref(value: string): string | null {
+  if (value.includes("@")) return `mailto:${value}`;
+  if (/^[+\d][\d\s()-]+$/.test(value)) return `tel:${value.replace(/[^\d+]/g, "")}`;
+  return null;
+}
+
 function getIcon(label: string): React.ReactNode {
   if (icons[label]) return icons[label];
   if (label === "ኢሜይል" || label === "Iimeelii") return icons.Email;
@@ -55,11 +61,12 @@ export function ContactPage(): React.ReactElement {
   // `website` is a honeypot: hidden below with CSS and tabindex -1, so a human
   // never fills it but a bot that submits every input does. The server drops
   // the message and reports success whenever it arrives non-empty.
-  const [form, setForm] = useState({ name: "", email: "", subject: "", message: "", website: "" });
+  const [form, setForm] = useState({ name: "", email: "", phone: "", subject: "", message: "", website: "" });
 
   const contactInfo = t("contact.info", { returnObjects: true }) as Array<{ label: string; value: string; sub: string }>;
+  const subjectOptions = t("contact.form.subjectOptions", { returnObjects: true }) as string[];
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
     setError("");
@@ -70,23 +77,42 @@ export function ContactPage(): React.ReactElement {
     setLoading(true);
     setError("");
 
+    // The server already bounds the SMTP round trip, but a wedged API must not
+    // leave the button spinning forever. Abort the request and tell the visitor
+    // to try again instead.
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 25_000);
+
     try {
       const res = await fetch(`${API_BASE}/contact`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...form, lang: i18n.language }),
+        signal: controller.signal,
       });
 
-      const data = await res.json();
+      const text = await res.text();
+      let data: { error?: string } | null = null;
+      try {
+        data = text ? (JSON.parse(text) as { error?: string }) : null;
+      } catch {
+        data = null;
+      }
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to send message");
+        throw new Error(data?.error || text.slice(0, 200) || `Request failed (${res.status})`);
       }
 
       setSent(true);
     } catch (err: unknown) {
-      setError(errorMessage(err, "Something went wrong. Please try again."));
+      const aborted = err instanceof DOMException && err.name === "AbortError";
+      setError(
+        aborted
+          ? t("contact.form.timeout")
+          : errorMessage(err, "Something went wrong. Please try again.")
+      );
     } finally {
+      window.clearTimeout(timer);
       setLoading(false);
     }
   };
@@ -172,18 +198,25 @@ export function ContactPage(): React.ReactElement {
               <h2 className="font-serif text-3xl text-foreground">{t("contact.sidebar.heading")}</h2>
               <p className="mt-3 text-muted-foreground">{t("contact.sidebar.sub")}</p>
               <div className="mt-10 space-y-4">
-                {contactInfo.map((row) => (
-                  <div key={row.label} className="group flex items-start gap-4 rounded-2xl border border-border bg-card p-5 transition-all duration-300 hover:border-gold/40 hover:shadow-[0_8px_30px_-8px_oklch(0.72_0.13_75_/_0.15)]">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gold/10 text-gold transition-colors group-hover:bg-gold/20">
-                      {getIcon(row.label)}
+                {contactInfo.map((row) => {
+                  const href = contactHref(row.value);
+                  return (
+                    <div key={row.label} className="group flex items-start gap-4 rounded-2xl border border-border bg-card p-5 transition-all duration-300 hover:border-gold/40 hover:shadow-[0_8px_30px_-8px_oklch(0.72_0.13_75_/_0.15)]">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gold/10 text-gold transition-colors group-hover:bg-gold/20">
+                        {getIcon(row.label)}
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gold">{row.label}</p>
+                        {href ? (
+                          <a href={href} className="mt-1 block font-serif text-lg text-foreground transition hover:text-gold">{row.value}</a>
+                        ) : (
+                          <p className="mt-1 font-serif text-lg text-foreground">{row.value}</p>
+                        )}
+                        <p className="mt-0.5 text-sm text-muted-foreground">{row.sub}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gold">{row.label}</p>
-                      <p className="mt-1 font-serif text-lg text-foreground">{row.value}</p>
-                      <p className="mt-0.5 text-sm text-muted-foreground">{row.sub}</p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </aside>
 
@@ -200,7 +233,7 @@ export function ContactPage(): React.ReactElement {
                     </div>
                     <h3 className="mt-8 font-serif text-4xl text-foreground">{t("contact.form.successTitle")}</h3>
                     <p className="mt-4 max-w-sm text-muted-foreground">{t("contact.form.successDesc")}</p>
-                    <button type="button" onClick={() => { setSent(false); setForm({ name: "", email: "", subject: "", message: "", website: "" }); }} className="mt-8 inline-flex items-center justify-center gap-2 rounded-full bg-gold px-10 py-3.5 text-sm font-semibold text-gold-foreground shadow-[var(--shadow-gold)] transition-all duration-300 hover:scale-105 hover:shadow-[0_15px_50px_-12px_oklch(0.72_0.13_75_/_0.6)]">
+                    <button type="button" onClick={() => { setSent(false); setForm({ name: "", email: "", phone: "", subject: "", message: "", website: "" }); }} className="mt-8 inline-flex items-center justify-center gap-2 rounded-full bg-gold px-10 py-3.5 text-sm font-semibold text-gold-foreground shadow-[var(--shadow-gold)] transition-all duration-300 hover:scale-105 hover:shadow-[0_15px_50px_-12px_oklch(0.72_0.13_75_/_0.6)]">
                       {t("contact.form.ok")}
                     </button>
                   </div>
@@ -220,8 +253,27 @@ export function ContactPage(): React.ReactElement {
                       <Field label={t("contact.form.name")} type="text" name="name" placeholder={t("contact.form.placeholders.name")} value={form.name} onChange={handleChange} />
                       <Field label={t("contact.form.email")} type="email" name="email" placeholder={t("contact.form.placeholders.email")} value={form.email} onChange={handleChange} />
                     </div>
-                    <div className="mt-5">
-                      <Field label={t("contact.form.subject")} type="text" name="subject" placeholder={t("contact.form.placeholders.subject")} value={form.subject} onChange={handleChange} />
+                    <div className="mt-5 grid gap-5 sm:grid-cols-2">
+                      <Field label={t("contact.form.phone")} type="tel" name="phone" placeholder={t("contact.form.placeholders.phone")} value={form.phone} onChange={handleChange} required={false} />
+                      <label className="block">
+                        <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">{t("contact.form.subject")}</span>
+                        <select
+                          required
+                          name="subject"
+                          value={form.subject}
+                          onChange={handleChange}
+                          className="mt-3 w-full rounded-xl border border-border bg-background px-4 py-3.5 text-sm text-foreground transition-all duration-300 focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/20 focus:shadow-[0_0_0_4px_oklch(0.72_0.13_75_/_0.08)]"
+                        >
+                          <option value="" disabled>
+                            {t("contact.form.placeholders.subject")}
+                          </option>
+                          {subjectOptions.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
                     </div>
                     <div className="mt-5">
                       <label className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">{t("contact.form.message")}</label>
@@ -262,11 +314,11 @@ export function ContactPage(): React.ReactElement {
   );
 }
 
-function Field({ label, ...rest }: { label: string } & React.InputHTMLAttributes<HTMLInputElement>): React.ReactElement {
+function Field({ label, required = true, ...rest }: { label: string; required?: boolean } & React.InputHTMLAttributes<HTMLInputElement>): React.ReactElement {
   return (
     <label className="block">
       <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">{label}</span>
-      <input required {...rest} className="mt-3 w-full rounded-xl border border-border bg-background px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/50 transition-all duration-300 focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/20 focus:shadow-[0_0_0_4px_oklch(0.72_0.13_75_/_0.08)]" />
+      <input required={required} {...rest} className="mt-3 w-full rounded-xl border border-border bg-background px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/50 transition-all duration-300 focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/20 focus:shadow-[0_0_0_4px_oklch(0.72_0.13_75_/_0.08)]" />
     </label>
   );
 }

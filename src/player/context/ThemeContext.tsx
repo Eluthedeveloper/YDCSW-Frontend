@@ -53,6 +53,7 @@ export function PlayerThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     return () => {
       document.documentElement.classList.remove('dark');
+      document.documentElement.classList.remove('light');
     };
   }, []);
 

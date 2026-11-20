@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import '../i18n';
 import NotificationBell from './NotificationBell';
 import { api } from '../player/utils/api';
@@ -24,10 +24,15 @@ function feed(minutesAgo: number): WhatsNewItem[] {
       title: 'New building dedicated',
       summary: 'The new worship centre opened on Sunday.',
       image: null,
-      url: '/',
+      url: '/#announcements',
       published_at: new Date(Date.now() - minutesAgo * 60_000).toISOString(),
     },
   ];
+}
+
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location">{`${location.pathname}${location.hash}`}</div>;
 }
 
 function renderBell() {
@@ -126,6 +131,33 @@ describe('NotificationBell', () => {
     await user.click(await screen.findByRole('button', { name: /new update/ }));
     await user.click(await screen.findByText('New building dedicated'));
 
-    expect(assign).toHaveBeenCalledWith('https://yemisrachdimts.org/');
+    expect(assign).toHaveBeenCalledWith('https://yemisrachdimts.org/#announcements');
+  });
+
+  it('navigates to the target section and scrolls to it on the main site', async () => {
+    const scrollIntoView = vi.fn();
+    const original = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = scrollIntoView;
+    localStorage.setItem(SEEN_KEY, String(Date.now() - 60 * 60_000));
+    getWhatsNew.mockResolvedValue(feed(5));
+
+    try {
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter initialEntries={['/']}>
+          <NotificationBell />
+          <div id="announcements">Announcements section</div>
+          <LocationProbe />
+        </MemoryRouter>
+      );
+
+      await user.click(await screen.findByRole('button', { name: /new update/ }));
+      await user.click(await screen.findByText('New building dedicated'));
+
+      expect(screen.getByTestId('location')).toHaveTextContent('/#announcements');
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
+    } finally {
+      HTMLElement.prototype.scrollIntoView = original;
+    }
   });
 });

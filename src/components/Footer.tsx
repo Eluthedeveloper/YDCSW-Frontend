@@ -37,7 +37,7 @@ const SOCIAL_LINKS = [
   },
   {
     name: "Telegram",
-    href: "https:/https:/t.me/YDRadio",
+    href: "https://t.me/YDRadio",
     color: "#0088CC",
     icon: (
       <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">

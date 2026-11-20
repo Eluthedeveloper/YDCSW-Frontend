@@ -3,24 +3,11 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { Suspense } from 'react';
 
-/**
- * Mounting the real route tree is the only reliable guard against the router
- * being dropped: App renders <Routes> and calls useLocation(), both of which
- * throw "useLocation() may be used only in the context of a <Router>" when the
- * provider is missing. This regressed once and blanked every page, so it is
- * worth asserting on directly rather than trusting a manual smoke check.
- */
 
 const fetchMock = vi.fn();
-
 const SUPER_ADMIN = { id: 'u1', username: 'superadmin', role: 'super_admin', email: 's@a.com' };
 const EDITOR = { id: 'u2', username: 'editor', role: 'editor', email: 'e@a.com' };
 
-/**
- * One mock has to answer every call the app makes: `/auth/me` with a user and
- * the list endpoints with arrays. Returning a single canned body made list
- * pages crash on `programs.map`, so responses are keyed by URL instead.
- */
 function mockApi({ signedIn = false, user = SUPER_ADMIN }: { signedIn?: boolean; user?: typeof SUPER_ADMIN } = {}) {
   fetchMock.mockImplementation((input: RequestInfo | URL) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
@@ -78,9 +65,7 @@ describe('App router wiring', () => {
     expect(window.location.pathname).toBe('/admin/player/programs');
   });
 
-  // Every /admin/player/* path used to render the same component with local
-  // state defaulted to 'programs', so a deep link to any other section landed
-  // on Programs. The section now comes from the URL.
+ 
   it('honours a deep link to a specific admin section', async () => {
     mockApi({ signedIn: true });
     const App = await loadApp();
@@ -125,10 +110,6 @@ describe('App router wiring', () => {
     expect(await screen.findByRole('heading', { name: 'Blog' }, { timeout: 5_000 })).toBeTruthy();
   });
 
-  // The stream subdomain renders its own route tree, whose root serves the
-  // player home directly at the bare URL. Mounted directly under MemoryRouter:
-  // the host branch in AppRoutes is a one-line check (unit-tested via
-  // lib/hosts), and jsdom makes stubbing window.location.hostname unreliable.
   it('stream route tree serves the program library at the root', async () => {
     const { StreamRoutes } = await import('./App');
 

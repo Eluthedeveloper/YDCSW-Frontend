@@ -13,15 +13,11 @@ import headPrint from "../assets/hero-worship.jpg";
 import headFinance from "../assets/head-finance.png";
 import directorPhoto from "../assets/gemechis.png";
 
-// For Vestment we have no photo yet – use a placeholder
-const vestmentPhoto = "/images/head-vestment-placeholder.jpg"; // replace
-
 const photosById: Record<string, string> = {
   director: directorPhoto,
   electronic: headElectronic,
   finance: headFinance,
   print: headPrint,
-  vestment: vestmentPhoto,
 };
 
 interface LeaderMember {

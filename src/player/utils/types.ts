@@ -74,6 +74,7 @@ export interface MeUpdateInput {
   username?: string;
   email?: string;
   password?: string;
+  current_password?: string;
 }
 
 export interface TrackUpdateInput {
@@ -192,4 +193,104 @@ export interface WhatsNewItem {
   image?: string | null;
   url: string;
   published_at: string;
+}
+
+export type ChatLang = 'en' | 'am' | 'om';
+
+export interface ChatbotReply {
+  reply: string;
+  matched: boolean;
+  intent?: string | null;
+  confidence: number;
+  language: ChatLang;
+  conversationId: string;
+  restarted?: boolean;
+}
+
+export interface ChatbotSettings {
+  confidence_threshold: number;
+  fuzzy_threshold: number;
+  welcome_messages: Record<ChatLang, string>;
+  fallback_messages: Record<ChatLang, string>;
+  enabled_languages: ChatLang[];
+  auto_approve_content: boolean;
+  sync_interval_minutes: number;
+  max_history_turns: number;
+}
+
+export interface ChatbotMessage {
+  id: string;
+  sender: 'visitor' | 'bot';
+  message: string;
+  matched_knowledge_id?: string | null;
+  confidence_score?: number | null;
+  created_at: string;
+}
+
+export interface ChatbotKnowledge {
+  id: string;
+  intent_id: string | null;
+  intent_name: string | null;
+  language: ChatLang;
+  question: string;
+  alternative_questions: string | null;
+  keywords: string | null;
+  answer: string;
+  priority: number;
+  is_active: number;
+  source_type: 'manual' | 'content_sync';
+  source_url: string | null;
+  sync_status: 'approved' | 'pending' | 'rejected';
+  updated_at: string;
+}
+
+export interface ChatbotInput {
+  intent_id: string | null;
+  language: ChatLang;
+  question: string;
+  alternative_questions: string[];
+  keywords: string[];
+  answer: string;
+  priority: number;
+  is_active: boolean;
+  sync_status: 'approved' | 'pending' | 'rejected';
+}
+
+export interface ChatbotIntent {
+  id: string;
+  name: string;
+  description: string | null;
+  is_active: number;
+}
+
+export interface ChatbotAnalytics {
+  totals: {
+    conversations: number;
+    questions: number;
+    answered: number;
+    unanswered: number;
+    successRate: number;
+  };
+  topQuestions: Array<{ question: string; count: number }>;
+  topIntents: Array<{ intent: string; count: number }>;
+}
+
+export interface ChatbotConversation {
+  id: string;
+  session_id: string;
+  language: ChatLang;
+  started_at: string;
+  last_activity: string;
+  message_count: number;
+  unanswered: number;
+}
+
+export interface ChatbotSyncSource {
+  source_table: string;
+  source_id: string;
+  language: string;
+  content_version: string;
+  status: string;
+  last_error: string | null;
+  last_synced_at: string;
 }

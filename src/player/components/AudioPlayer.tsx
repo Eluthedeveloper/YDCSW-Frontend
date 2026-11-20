@@ -96,11 +96,15 @@ function DraggableProgress({
     window.addEventListener('mouseup', onMouseUp);
     window.addEventListener('touchmove', onTouchMove, { passive: true });
     window.addEventListener('touchend', onTouchEnd);
+    // A cancelled touch (system gesture, scroll takeover) never fires touchend.
+    // Without this the drag stayed active and progress froze for the session.
+    window.addEventListener('touchcancel', onTouchEnd);
     return () => {
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onMouseUp);
       window.removeEventListener('touchmove', onTouchMove);
       window.removeEventListener('touchend', onTouchEnd);
+      window.removeEventListener('touchcancel', onTouchEnd);
     };
   }, [handleMove, handleUp]);
 
@@ -180,11 +184,15 @@ function DraggableVolume({
     window.addEventListener('mouseup', onMouseUp);
     window.addEventListener('touchmove', onTouchMove, { passive: true });
     window.addEventListener('touchend', onTouchEnd);
+    // A cancelled touch (system gesture, scroll takeover) never fires touchend.
+    // Without this the drag stayed active and progress froze for the session.
+    window.addEventListener('touchcancel', onTouchEnd);
     return () => {
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onMouseUp);
       window.removeEventListener('touchmove', onTouchMove);
       window.removeEventListener('touchend', onTouchEnd);
+      window.removeEventListener('touchcancel', onTouchEnd);
     };
   }, [handleMove, handleUp]);
 
@@ -335,6 +343,14 @@ export default function AudioPlayer() {
     if (currentTrack) reconnect();
   };
 
+  // Closing from the full-screen view must also collapse it. `close()` only
+  // clears the track, so without this the body stayed scroll-locked and the
+  // effect never re-ran because `expanded` was still true.
+  const handleClose = useCallback(() => {
+    setExpanded(false);
+    close();
+  }, [close]);
+
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     touchStartY.current = e.touches[0].clientY;
     isDragging.current = true;
@@ -357,13 +373,10 @@ export default function AudioPlayer() {
   }, []);
 
   useEffect(() => {
-    if (expanded) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
+    if (!(expanded && currentTrack)) return;
+    document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = ''; };
-  }, [expanded]);
+  }, [expanded, currentTrack]);
 
   if (!currentTrack) {
     return null;
@@ -394,7 +407,7 @@ export default function AudioPlayer() {
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-white/40">{t('audioPlayer.playingFrom')}</p>
                 <p className="text-xs font-semibold text-white/80 truncate max-w-[200px]">{t('audioPlayer.program')}</p>
               </div>
-              <button onClick={close}
+              <button onClick={handleClose}
                 className="p-2 -mr-2 rounded-full text-white/60 hover:text-white active:bg-white/10 transition-colors">
                 <X size={22} />
               </button>
@@ -539,7 +552,7 @@ export default function AudioPlayer() {
                 <SkipForward size={18} fill="currentColor" />
               </button>
               <div className="w-px h-5 dark:bg-white/10 bg-dark-300" />
-              <button onClick={(e) => { e.stopPropagation(); close(); }} aria-label={t('controls.close')}
+              <button onClick={(e) => { e.stopPropagation(); handleClose(); }} aria-label={t('controls.close')}
                 className="p-2 dark:text-dark-300 text-dark-500 dark:hover:text-red-400 hover:text-red-500 active:scale-90 transition-all">
                 <X size={16} />
               </button>
@@ -630,7 +643,7 @@ export default function AudioPlayer() {
               />
             </div>
             <div className="w-px h-6 dark:bg-white/10 bg-dark-300 flex-shrink-0" />
-            <button onClick={close} aria-label={t('controls.close')}
+            <button onClick={handleClose} aria-label={t('controls.close')}
               className="p-2 dark:text-dark-300 text-dark-500 dark:hover:text-red-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all flex-shrink-0">
               <X size={16} />
             </button>

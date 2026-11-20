@@ -5,10 +5,11 @@ import { toast } from 'sonner';
 import { User, Mail, Lock, Save, Loader2, ShieldCheck } from 'lucide-react';
 
 export default function AccountSettingsPage() {
-  const { user, isSuperAdmin } = usePlayerAuth();
+  const { user, isSuperAdmin, updateUser } = usePlayerAuth();
   const [username, setUsername] = useState(user?.username || '');
   const [email, setEmail] = useState(user?.email || '');
   const [password, setPassword] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
   const [saving, setSaving] = useState(false);
 
   if (!isSuperAdmin) {
@@ -24,7 +25,7 @@ export default function AccountSettingsPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      const updates: { username?: string; email?: string; password?: string } = {};
+      const updates: { username?: string; email?: string; password?: string; current_password?: string } = {};
       if (username !== user?.username) updates.username = username;
       if (email !== user?.email) updates.email = email;
       if (password) updates.password = password;
@@ -34,10 +35,20 @@ export default function AccountSettingsPage() {
         setSaving(false);
         return;
       }
+      // The server requires the existing password for any identity or password
+      // change, so a stolen session cannot take over the account.
+      if (!currentPassword) {
+        toast.error('Enter your current password to save changes');
+        setSaving(false);
+        return;
+      }
+      updates.current_password = currentPassword;
 
       const updated = await api.updateMe(updates);
       toast.success('Account updated successfully');
+      updateUser(updated);
       setPassword('');
+      setCurrentPassword('');
       if (updated.username) setUsername(updated.username);
       if (updated.email) setEmail(updated.email);
       // No token to store: the server re-issues the httpOnly session cookie on
@@ -84,6 +95,20 @@ export default function AccountSettingsPage() {
             />
           </div>
 
+          <div className="mb-5">
+            <label className="flex items-center gap-2 text-xs font-medium dark:text-dark-100 text-dark-700 mb-1.5">
+              <Lock size={14} /> Current Password
+            </label>
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              placeholder="Required to change your username, email, or password"
+              autoComplete="current-password"
+              className="w-full px-4 py-3 dark:bg-dark-600 bg-white border dark:border-white/5 border-dark-300 rounded-lg dark:text-white text-dark-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 placeholder:text-dark-400"
+            />
+          </div>
+
           <div className="mb-6">
             <label className="flex items-center gap-2 text-xs font-medium dark:text-dark-100 text-dark-700 mb-1.5">
               <Lock size={14} /> New Password
@@ -93,7 +118,8 @@ export default function AccountSettingsPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Leave blank to keep current password"
-              minLength={6}
+              minLength={8}
+              autoComplete="new-password"
               className="w-full px-4 py-3 dark:bg-dark-600 bg-white border dark:border-white/5 border-dark-300 rounded-lg dark:text-white text-dark-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 placeholder:text-dark-400"
             />
           </div>

@@ -166,8 +166,8 @@ export function BlogPage(): React.ReactElement {
   const { t, i18n } = useTranslation();
   const [category, setCategory] = useState<string | null>(null);
 
-  const { data: posts, loading } = useAsyncData<BlogPost[]>(
-    () => api.getBlogPosts().catch(() => [] as BlogPost[]),
+  const { data: posts, loading, error, reload } = useAsyncData<BlogPost[]>(
+    () => api.getBlogPosts(),
     []
   );
 
@@ -221,6 +221,17 @@ export function BlogPage(): React.ReactElement {
 
             {loading ? (
               <Loading />
+            ) : error ? (
+              <div className="mt-10 rounded-3xl border border-dashed border-border py-24 text-center">
+                <p className="font-serif text-2xl text-foreground">{t("blog.loadError")}</p>
+                <button
+                  type="button"
+                  onClick={reload}
+                  className="mt-5 rounded-full bg-gold px-5 py-2 text-xs font-semibold uppercase tracking-widest text-gold-foreground"
+                >
+                  {t("blog.retry")}
+                </button>
+              </div>
             ) : !featured ? (
               <div className="mt-10 rounded-3xl border border-dashed border-border py-24 text-center">
                 <Newspaper size={44} className="mx-auto text-gold" />
@@ -299,8 +310,8 @@ export function BlogPostPage(): React.ReactElement {
   const { t, i18n } = useTranslation();
   const { slug } = useParams<{ slug: string }>();
 
-  const { data: post, loading } = useAsyncData<BlogPost | null>(
-    () => (slug ? api.getBlogPost(slug).catch(() => null) : Promise.resolve(null)),
+  const { data: post, loading, error: postError, reload: reloadPost } = useAsyncData<BlogPost | null>(
+    () => (slug ? api.getBlogPost(slug) : Promise.resolve(null)),
     null,
     [slug]
   );
@@ -322,6 +333,17 @@ export function BlogPostPage(): React.ReactElement {
           <div className="pt-40">
             <Loading />
           </div>
+        ) : postError ? (
+          <section className="mx-auto max-w-3xl px-6 pb-32 pt-40 text-center">
+            <p className="font-serif text-3xl text-foreground">{t("blog.loadError")}</p>
+            <button
+              type="button"
+              onClick={reloadPost}
+              className="mt-8 rounded-full bg-gold px-7 py-3 text-sm font-semibold text-gold-foreground shadow-[var(--shadow-gold)]"
+            >
+              {t("blog.retry")}
+            </button>
+          </section>
         ) : !post ? (
           <section className="mx-auto max-w-3xl px-6 pb-32 pt-40 text-center">
             <Newspaper size={44} className="mx-auto text-gold" />
