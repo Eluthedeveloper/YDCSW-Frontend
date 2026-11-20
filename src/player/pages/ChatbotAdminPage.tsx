@@ -496,12 +496,12 @@ export default function ChatbotAdminPage() {
                 <label key={lang} className="flex items-center gap-2 text-sm dark:text-dark-100 text-dark-700">
                   <input
                     type="checkbox"
-                    checked={settingsForm.enabled_languages.includes(lang)}
+                    checked={(settingsForm.enabled_languages ?? []).includes(lang)}
                     onChange={(event) => settings.setData({
                       ...settingsForm,
                       enabled_languages: event.target.checked
-                        ? [...settingsForm.enabled_languages, lang]
-                        : settingsForm.enabled_languages.filter((item) => item !== lang),
+                        ? [...(settingsForm.enabled_languages ?? []), lang]
+                        : (settingsForm.enabled_languages ?? []).filter((item) => item !== lang),
                     })}
                   />
                   {lang.toUpperCase()}
@@ -525,10 +525,10 @@ export default function ChatbotAdminPage() {
                 <label className={labelClass}>Welcome message — {lang.toUpperCase()}</label>
                 <textarea
                   rows={2}
-                  value={settingsForm.welcome_messages[lang] ?? ''}
+                  value={settingsForm.welcome_messages?.[lang] ?? ''}
                   onChange={(event) => settings.setData({
                     ...settingsForm,
-                    welcome_messages: { ...settingsForm.welcome_messages, [lang]: event.target.value },
+                    welcome_messages: { ...(settingsForm.welcome_messages ?? {}), [lang]: event.target.value },
                   })}
                   className={inputClass}
                 />
@@ -537,10 +537,10 @@ export default function ChatbotAdminPage() {
                 <label className={labelClass}>Fallback message — {lang.toUpperCase()}</label>
                 <textarea
                   rows={2}
-                  value={settingsForm.fallback_messages[lang] ?? ''}
+                  value={settingsForm.fallback_messages?.[lang] ?? ''}
                   onChange={(event) => settings.setData({
                     ...settingsForm,
-                    fallback_messages: { ...settingsForm.fallback_messages, [lang]: event.target.value },
+                    fallback_messages: { ...(settingsForm.fallback_messages ?? {}), [lang]: event.target.value },
                   })}
                   className={inputClass}
                 />

@@ -27,14 +27,29 @@ const TABS: Array<{ id: Tab; label: string; icon: typeof Users }> = [
 ];
 
 /** MySQL DATETIME → the value a `datetime-local` input expects. */
-function toInputValue(mysql: string | null | undefined): string {
+function toDateValue(mysql: string | null | undefined): string {
+  return mysql ? mysql.slice(0, 10) : '';
+}
+
+function toTimeValue(mysql: string | null | undefined): string {
   if (!mysql) return '';
-  return mysql.replace(' ', 'T').slice(0, 16);
+  const time = mysql.slice(11, 16);
+  return time === '00:00' ? '' : time;
+}
+
+function combineEventDate(date: string, time: string): string {
+  return time ? `${date}T${time}` : date;
 }
 
 function formatDateTime(mysql: string): string {
   const parsed = new Date(mysql.replace(' ', 'T'));
   return Number.isNaN(parsed.getTime()) ? mysql : parsed.toLocaleString();
+}
+
+function formatEventDate(mysql: string): string {
+  const parsed = new Date(mysql.replace(' ', 'T'));
+  if (Number.isNaN(parsed.getTime())) return mysql;
+  return /[T ]00:00:00$/.test(mysql) ? parsed.toLocaleDateString() : parsed.toLocaleString();
 }
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
@@ -108,7 +123,7 @@ export default function SiteContentPage() {
   const [editingAnn, setEditingAnn] = useState<Announcement | null>(null);
   const [showAnnForm, setShowAnnForm] = useState(false);
 
-  const [eventForm, setEventForm] = useState({ title: '', description: '', location: '', starts_at: '', ends_at: '' });
+  const [eventForm, setEventForm] = useState({ title: '', description: '', location: '', starts_at: '', ends_at: '', starts_time: '', ends_time: '' });
   const [editingEvent, setEditingEvent] = useState<SiteEvent | null>(null);
   const [showEventForm, setShowEventForm] = useState(false);
 
@@ -352,7 +367,13 @@ export default function SiteContentPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      const payload = { ...eventForm, description: eventForm.description, location: eventForm.location };
+      const payload = {
+        title: eventForm.title,
+        description: eventForm.description,
+        location: eventForm.location,
+        starts_at: combineEventDate(eventForm.starts_at, eventForm.starts_time),
+        ends_at: eventForm.ends_at ? combineEventDate(eventForm.ends_at, eventForm.ends_time) : '',
+      };
       if (editingEvent) {
         await api.updateSiteEvent(editingEvent.id, payload);
         toast.success('Event updated');
@@ -693,7 +714,7 @@ export default function SiteContentPage() {
         <section>
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm dark:text-dark-300 text-dark-500">Upcoming events shown on the homepage. The most recent dates appear first.</p>
-            <button onClick={() => { setEventForm({ title: '', description: '', location: '', starts_at: '', ends_at: '' }); setEditingEvent(null); setShowEventForm(true); }} className={primaryButton}>
+            <button onClick={() => { setEventForm({ title: '', description: '', location: '', starts_at: '', ends_at: '', starts_time: '', ends_time: '' }); setEditingEvent(null); setShowEventForm(true); }} className={primaryButton}>
               <Plus size={16} /> New Event
             </button>
           </div>
@@ -712,8 +733,8 @@ export default function SiteContentPage() {
                       {event.location && <span className="text-xs dark:text-dark-300 text-dark-500">· {event.location}</span>}
                     </div>
                     <p className="text-xs text-primary-400 mt-1">
-                      {formatDateTime(event.starts_at)}
-                      {event.ends_at ? ` – ${formatDateTime(event.ends_at)}` : ''}
+                      {formatEventDate(event.starts_at)}
+                      {event.ends_at ? ` – ${formatEventDate(event.ends_at)}` : ''}
                     </p>
                     {event.description && <p className="text-sm dark:text-dark-200 text-dark-600 mt-1 whitespace-pre-wrap">{event.description}</p>}
                   </div>
@@ -722,7 +743,8 @@ export default function SiteContentPage() {
                       onClick={() => {
                         setEventForm({
                           title: event.title, description: event.description ?? '', location: event.location ?? '',
-                          starts_at: toInputValue(event.starts_at), ends_at: toInputValue(event.ends_at),
+                          starts_at: toDateValue(event.starts_at), ends_at: toDateValue(event.ends_at),
+                          starts_time: toTimeValue(event.starts_at), ends_time: toTimeValue(event.ends_at),
                         });
                         setEditingEvent(event);
                         setShowEventForm(true);
@@ -753,13 +775,21 @@ export default function SiteContentPage() {
                 </div>
                 <div className="mb-3">
                   <label className={labelClass} htmlFor="event-start">Starts</label>
-                  <input id="event-start" type="datetime-local" value={eventForm.starts_at} required
-                    onChange={(e) => setEventForm({ ...eventForm, starts_at: e.target.value })} className={inputClass} />
+                  <div className="flex gap-2">
+                    <input id="event-start" type="date" value={eventForm.starts_at} required
+                      onChange={(e) => setEventForm({ ...eventForm, starts_at: e.target.value })} className={inputClass} />
+                    <input aria-label="Start time (optional)" type="time" value={eventForm.starts_time}
+                      onChange={(e) => setEventForm({ ...eventForm, starts_time: e.target.value })} className={inputClass} />
+                  </div>
                 </div>
                 <div className="mb-3">
                   <label className={labelClass} htmlFor="event-end">Ends (optional)</label>
-                  <input id="event-end" type="datetime-local" value={eventForm.ends_at}
-                    onChange={(e) => setEventForm({ ...eventForm, ends_at: e.target.value })} className={inputClass} />
+                  <div className="flex gap-2">
+                    <input id="event-end" type="date" value={eventForm.ends_at}
+                      onChange={(e) => setEventForm({ ...eventForm, ends_at: e.target.value })} className={inputClass} />
+                    <input aria-label="End time (optional)" type="time" value={eventForm.ends_time}
+                      onChange={(e) => setEventForm({ ...eventForm, ends_time: e.target.value })} className={inputClass} />
+                  </div>
                 </div>
                 <div className="mb-6">
                   <label className={labelClass} htmlFor="event-desc">Description</label>

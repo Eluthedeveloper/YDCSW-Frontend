@@ -250,6 +250,37 @@ function Notices() {
       : parsed.toLocaleString(undefined, { dateStyle: "full", timeStyle: "short" });
   };
 
+  // Stored midnight means the admin left the time blank: an all-day event.
+  const isAllDay = (mysql: string) => /[T ]00:00:00$/.test(mysql);
+  const formatDateOnly = (mysql: string) => {
+    const parsed = new Date(mysql.replace(" ", "T"));
+    return Number.isNaN(parsed.getTime())
+      ? mysql
+      : parsed.toLocaleDateString(undefined, { dateStyle: "full" });
+  };
+  const formatEventDate = (mysql: string) =>
+    isAllDay(mysql) ? formatDateOnly(mysql) : formatDate(mysql);
+
+  // Multi-day events need both dates; a same-day event reads better with the
+  // date once and only the end time after the dash.
+  const formatEventRange = (start: string, end?: string | null) => {
+    if (!end) return formatEventDate(start);
+    const startDate = new Date(start.replace(" ", "T"));
+    const endDate = new Date(end.replace(" ", "T"));
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+      return `${start} – ${end}`;
+    }
+    const sameDay =
+      startDate.getFullYear() === endDate.getFullYear() &&
+      startDate.getMonth() === endDate.getMonth() &&
+      startDate.getDate() === endDate.getDate();
+    if (sameDay) {
+      if (isAllDay(start) || isAllDay(end)) return formatDateOnly(start);
+      return `${formatDate(start)} – ${endDate.toLocaleTimeString(undefined, { timeStyle: "short" })}`;
+    }
+    return `${formatEventDate(start)} – ${formatEventDate(end)}`;
+  };
+
   return (
     <section className="bg-secondary py-24 lg:py-32">
       <div className="mx-auto max-w-7xl px-6 lg:px-12">
@@ -294,7 +325,7 @@ function Notices() {
                         <span className="text-xs uppercase tracking-widest text-gold">{event.location}</span>
                       )}
                     </div>
-                    <p className="mt-2 text-sm font-medium text-gold">{formatDate(event.starts_at)}</p>
+                    <p className="mt-2 text-sm font-medium text-gold">{formatEventRange(event.starts_at, event.ends_at)}</p>
                     {event.description && (
                       <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{event.description}</p>
                     )}
