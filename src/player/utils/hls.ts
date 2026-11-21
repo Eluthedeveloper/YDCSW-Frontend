@@ -62,6 +62,8 @@ export async function attachHls(
     lowLatencyMode: false,
     // Keep a short back-buffer so a seek backwards does not re-fetch segments.
     backBufferLength: 90,
+    manifestLoadingTimeOut: 2000,
+    manifestLoadingMaxRetry: 0,
   });
 
   let fellBack = false;

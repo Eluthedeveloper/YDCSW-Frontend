@@ -111,6 +111,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const hlsRef = useRef<{ destroy: () => void } | null>(null);
   const hlsModeRef = useRef<'native' | 'mse' | null>(null);
   const nativeFallbackRef = useRef<(() => void) | null>(null);
+  const hlsStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadTokenRef = useRef(0);
 
   // The media element listeners below are registered once on mount and need to
@@ -126,6 +127,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
    * turns that silence into the same error-and-retry the other failures use.
    */
   const STALL_TIMEOUT_MS = 12000;
+  const HLS_START_TIMEOUT_MS = 2000;
 
   const clearStallWatchdog = useCallback(() => {
     if (stallTimerRef.current !== null) {
@@ -155,6 +157,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     reconnectRestoreRef.current = null;
   }, []);
 
+  const clearHlsStartTimer = useCallback(() => {
+    if (hlsStartTimerRef.current !== null) {
+      clearTimeout(hlsStartTimerRef.current);
+      hlsStartTimerRef.current = null;
+    }
+  }, []);
+
   /**
    * Detaches hls.js and forgets how the current source was loaded.
    *
@@ -163,11 +172,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
    * next `src` assignment.
    */
   const destroyHls = useCallback(() => {
+    clearHlsStartTimer();
     hlsRef.current?.destroy();
     hlsRef.current = null;
     hlsModeRef.current = null;
     nativeFallbackRef.current = null;
-  }, []);
+  }, [clearHlsStartTimer]);
   /**
    * Classifies a MediaError. Codes per the HTML spec: 1 aborted, 2 network,
    * 3 decode, 4 source unsupported. An aborted load is what `close()` and track
@@ -318,6 +328,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
     return () => {
       clearStallWatchdog();
+      clearHlsStartTimer();
       loadTokenRef.current += 1;
       hlsRef.current?.destroy();
       hlsRef.current = null;
@@ -403,6 +414,18 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         playWith(audio, token);
       };
 
+      const armHlsStartTimer = (from: number) => {
+        clearHlsStartTimer();
+        hlsStartTimerRef.current = setTimeout(() => {
+          hlsStartTimerRef.current = null;
+          if (fallbackStarted || loadTokenRef.current !== token) return;
+          if (hlsModeRef.current === null) return;
+          if (!audio.paused && !audio.ended) return;
+          const resumeAt = Number.isFinite(audio.currentTime) ? audio.currentTime : from;
+          loadProgressive(resumeAt);
+        }, HLS_START_TIMEOUT_MS);
+      };
+
       if (hlsEnabled() && supportsNativeHls(audio)) {
         hlsModeRef.current = 'native';
         nativeFallbackRef.current = () => {
@@ -414,6 +437,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         audio.load();
         restore();
         playWith(audio, token);
+        armHlsStartTimer(at);
         return;
       }
 
@@ -444,6 +468,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
           armRestore();
           restore();
           playWith(audio, token);
+          armHlsStartTimer(at);
         })
         .catch((error: unknown) => {
           if (fallbackStarted || loadTokenRef.current !== token) return;
@@ -451,7 +476,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
           loadProgressive(at);
         });
     },
-    [clearReconnectRestore, destroyHls, playWith]
+    [clearHlsStartTimer, clearReconnectRestore, destroyHls, playWith]
   );
 
   const play = useCallback((track: Track, list?: Track[]) => {
