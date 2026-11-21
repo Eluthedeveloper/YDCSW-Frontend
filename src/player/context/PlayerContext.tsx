@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import { api, trackStreamUrl } from '../utils/api';
+import { api, trackStreamUrl, trackHlsUrl } from '../utils/api';
+import { attachHls, hlsEnabled, supportsMse, supportsNativeHls } from '../utils/hls';
 import type { Track } from '../utils/types';
 
 export type { Track } from '../utils/types';
@@ -103,6 +104,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   // different track and seek that one to the old position.
   const reconnectRestoreRef = useRef<(() => void) | null>(null);
 
+  // HLS state. `hlsModeRef` is 'native' for Safari's built-in support and
+  // 'mse' while hls.js is attached; null means the progressive element is in
+  // use. `loadTokenRef` identifies the current source so a slow dynamic import
+  // or a late HLS error cannot touch a track the listener has already left.
+  const hlsRef = useRef<{ destroy: () => void } | null>(null);
+  const hlsModeRef = useRef<'native' | 'mse' | null>(null);
+  const nativeFallbackRef = useRef<(() => void) | null>(null);
+  const loadTokenRef = useRef(0);
+
   // The media element listeners below are registered once on mount and need to
   // reach the current `play`, but registering them before `play` is declared
   // would capture a stale closure. A ref keeps them pointed at the live one.
@@ -143,6 +153,20 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       audio.removeEventListener('loadedmetadata', reconnectRestoreRef.current);
     }
     reconnectRestoreRef.current = null;
+  }, []);
+
+  /**
+   * Detaches hls.js and forgets how the current source was loaded.
+   *
+   * Every source change goes through here, because an hls.js instance left
+   * attached keeps its own MediaSource on the element and would fight the
+   * next `src` assignment.
+   */
+  const destroyHls = useCallback(() => {
+    hlsRef.current?.destroy();
+    hlsRef.current = null;
+    hlsModeRef.current = null;
+    nativeFallbackRef.current = null;
   }, []);
   /**
    * Classifies a MediaError. Codes per the HTML spec: 1 aborted, 2 network,
@@ -236,6 +260,16 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     // Previously nothing listened, so the play button sat there doing nothing
     // with no indication anything had gone wrong.
     audio.addEventListener('error', () => {
+      // Safari's native HLS reports a missing packager as a media error with
+      // no useful code. The progressive stream is the answer, not an error
+      // message, so take that path before classifying anything.
+      const nativeFallback = hlsModeRef.current === 'native' ? nativeFallbackRef.current : null;
+      if (nativeFallback) {
+        nativeFallbackRef.current = null;
+        nativeFallback();
+        return;
+      }
+
       const code = classifyMediaError();
       setIsBuffering(false);
       setIsPlaying(false);
@@ -284,6 +318,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
     return () => {
       clearStallWatchdog();
+      loadTokenRef.current += 1;
+      hlsRef.current?.destroy();
+      hlsRef.current = null;
       audio.pause();
       audio.removeAttribute('src');
       audio.load();
@@ -294,6 +331,128 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     // Mount-only: this element and its listeners live for the provider's life.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recordListenIfDue]);
+
+  /**
+   * Plays the element, mapping a rejected play() onto the same error codes the
+   * `error` listener uses. A missing/unsupported source also fires `error`, so
+   * that event owns the specific message; this only catches the rest.
+   */
+  const playWith = useCallback((audio: HTMLAudioElement, token: number) => {
+    void audio.play()
+      .then(() => setIsPlaying(true))
+      .catch((err: unknown) => {
+        setIsPlaying(false);
+        setIsBuffering(false);
+        // AbortError/NotAllowedError happen when another track replaces this
+        // one or the browser blocks autoplay, and are not real failures.
+        if (err instanceof Error && ['NotSupportedError', 'AbortError', 'NotAllowedError'].includes(err.name)) return;
+        // A slow rejection from a track the listener already left must not
+        // overwrite the current track's state.
+        if (loadTokenRef.current !== token) return;
+        console.warn('Playback could not start:', err);
+        setPlaybackError(classifyMediaError() ?? 'unknown');
+      });
+  }, [classifyMediaError]);
+
+  /**
+   * Loads one track, preferring HLS and falling back to the progressive
+   * `.stream` URL whenever packaging is unavailable.
+   *
+   * Keeping the decision in one place is what lets play(), reconnect() and the
+   * HLS failure path share position restoration and error handling. `token`
+   * identifies this load, so an async hls.js import that resolves after the
+   * listener moved on cannot hijack the element.
+   */
+  const startPlayback = useCallback(
+    (audio: HTMLAudioElement, track: Track, at: number, token: number) => {
+      const streamUrl = trackStreamUrl(track.file_path);
+      const hlsUrl = trackHlsUrl(track.file_path);
+      let target = at;
+      let fallbackStarted = false;
+
+      const restore = () => {
+        if (reconnectRestoreRef.current === restore) reconnectRestoreRef.current = null;
+        if (target <= 0) return;
+        if (loadTokenRef.current !== token || audioRef.current !== audio) return;
+        try {
+          audio.currentTime = target;
+        } catch {
+          // No metadata yet; the loadedmetadata listener retries.
+        }
+      };
+
+      const armRestore = () => {
+        clearReconnectRestore();
+        if (target > 0) {
+          reconnectRestoreRef.current = restore;
+          audio.addEventListener('loadedmetadata', restore, { once: true });
+        }
+      };
+
+      const loadProgressive = (from: number) => {
+        if (fallbackStarted) return;
+        fallbackStarted = true;
+        if (loadTokenRef.current !== token) return;
+        target = from;
+        destroyHls();
+        setPlaybackError(null);
+        armRestore();
+        audio.src = streamUrl;
+        audio.load();
+        restore();
+        playWith(audio, token);
+      };
+
+      if (hlsEnabled() && supportsNativeHls(audio)) {
+        hlsModeRef.current = 'native';
+        nativeFallbackRef.current = () => {
+          const from = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+          loadProgressive(from);
+        };
+        armRestore();
+        audio.src = hlsUrl;
+        audio.load();
+        restore();
+        playWith(audio, token);
+        return;
+      }
+
+      if (!hlsEnabled() || !supportsMse()) {
+        loadProgressive(at);
+        return;
+      }
+
+      void attachHls(audio, hlsUrl, {
+        isCurrent: () => loadTokenRef.current === token,
+        onFatal: () => {
+          if (loadTokenRef.current !== token || fallbackStarted) return;
+          const from = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+          loadProgressive(from);
+        },
+      })
+        .then((handle) => {
+          if (fallbackStarted || loadTokenRef.current !== token) {
+            handle?.destroy();
+            return;
+          }
+          if (!handle) {
+            loadProgressive(at);
+            return;
+          }
+          hlsRef.current = handle;
+          hlsModeRef.current = 'mse';
+          armRestore();
+          restore();
+          playWith(audio, token);
+        })
+        .catch((error: unknown) => {
+          if (fallbackStarted || loadTokenRef.current !== token) return;
+          console.warn('HLS unavailable; using the progressive stream:', error);
+          loadProgressive(at);
+        });
+    },
+    [clearReconnectRestore, destroyHls, playWith]
+  );
 
   const play = useCallback((track: Track, list?: Track[]) => {
     if (list) { setPlaylist(list); playlistRef.current = list; }
@@ -306,33 +465,17 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (audioRef.current) {
       const audio = audioRef.current;
       clearReconnectRestore();
-      audio.src = trackStreamUrl(track.file_path);
-      audio.load();
+      destroyHls();
+      const token = ++loadTokenRef.current;
       // A new source supersedes whatever went wrong with the last one.
       setPlaybackError(null);
       initAudioContext();
       if (audioContextRef.current?.state === 'suspended') {
         void audioContextRef.current.resume();
       }
-      const startedSrc = audio.src;
-      audio.play()
-        .then(() => setIsPlaying(true))
-        .catch((err: unknown) => {
-          setIsPlaying(false);
-          setIsBuffering(false);
-          // A missing or unsupported source also fires the element's `error`
-          // event, which sets the specific message (and runs the 404 check).
-          // AbortError/NotAllowedError happen when another track replaces this
-          // one or the browser blocks autoplay, and are not real failures.
-          if (err instanceof Error && ['NotSupportedError', 'AbortError', 'NotAllowedError'].includes(err.name)) return;
-          // A slow rejection from a track the listener already left must not
-          // overwrite the current track's state.
-          if (audioRef.current?.src !== startedSrc) return;
-          console.warn('Playback could not start:', err);
-          setPlaybackError(classifyMediaError() ?? 'unknown');
-        });
+      startPlayback(audio, track, 0, token);
     }
-  }, [initAudioContext, classifyMediaError, clearReconnectRestore]);
+  }, [initAudioContext, clearReconnectRestore, destroyHls, startPlayback]);
 
   // Synced in an effect rather than assigned during render, which would be a
   // ref write in the render phase. The `ended` listener reads it only after
@@ -385,44 +528,22 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (!audio || !track) return;
 
     const at = audio.currentTime || 0;
-    // Seeking into a stream whose metadata has not loaded yet throws, so the
-    // restore waits for `loadedmetadata` and is also attempted immediately in
-    // case the browser already has it cached.
-    const restore = () => {
-      if (reconnectRestoreRef.current === restore) reconnectRestoreRef.current = null;
-      if (at <= 0) return;
-      // A different track may have replaced this source while we waited.
-      if (audioRef.current !== audio) return;
-      try {
-        audio.currentTime = at;
-      } catch {
-        // The browser refused the seek; playback still restarts from the top.
-      }
-    };
-
     clearReconnectRestore();
-    reconnectRestoreRef.current = restore;
-    audio.addEventListener('loadedmetadata', restore, { once: true });
-    audio.src = trackStreamUrl(track.file_path);
-    audio.load();
-    restore();
+    destroyHls();
+    const token = ++loadTokenRef.current;
 
     clearStallWatchdog();
     setPlaybackError(null);
     setIsBuffering(false);
-    void audio.play()
-      .then(() => setIsPlaying(true))
-      .catch((err: unknown) => {
-        setIsPlaying(false);
-        if (err instanceof Error && ['NotSupportedError', 'AbortError', 'NotAllowedError'].includes(err.name)) return;
-        if (audioRef.current !== audio) return;
-        setPlaybackError(classifyMediaError() ?? 'unknown');
-      });
-  }, [classifyMediaError, clearStallWatchdog, clearReconnectRestore]);
+    startPlayback(audio, track, at, token);
+  }, [clearStallWatchdog, clearReconnectRestore, destroyHls, startPlayback]);
 
   const close = useCallback(() => {
     clearStallWatchdog();
     clearReconnectRestore();
+    // Invalidate any pending HLS import/load before tearing the source down.
+    loadTokenRef.current += 1;
+    destroyHls();
     if (audioRef.current) {
       const audio = audioRef.current;
       audio.pause();
@@ -443,7 +564,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setDuration(0);
     setIsBuffering(false);
     pendingListenRef.current = null;
-  }, [clearStallWatchdog, clearReconnectRestore]);
+  }, [clearStallWatchdog, clearReconnectRestore, destroyHls]);
 
   const seek = useCallback((time: number) => {
     const audio = audioRef.current;

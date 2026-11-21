@@ -19,3 +19,13 @@ export const uploadUrl = (path: string) => `${API_BASE}/uploads/${path}`;
  */
 export const trackStreamUrl = (filePath: string) =>
   `${API_BASE}/uploads/tracks/${filePath.replace(/\.[^./\\]+$/, '')}.stream`;
+
+/**
+ * HLS playlist for a track, built on first request by the backend.
+ *
+ * The path mirrors the `.stream` stem, so the same upload can be played either
+ * as HLS or as a progressive file without a second column in the database.
+ * `VITE_HLS_ENABLED=false` keeps the player on the progressive stream.
+ */
+export const trackHlsUrl = (filePath: string) =>
+  `${API_BASE}/uploads/hls/${filePath.replace(/\.[^./\\]+$/, '')}/index.m3u8`;

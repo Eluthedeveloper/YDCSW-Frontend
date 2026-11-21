@@ -88,3 +88,7 @@ src/
 - The production bundle emits a chunk-size warning for the main entry. It is
   not an error; code-splitting the routes would address it if bundle size
   becomes a problem.
+`VITE_HLS_ENABLED=false` disables HLS and keeps the player on the progressive
+`.stream` URLs. HLS is on by default; the backend packages new uploads in the
+background with ffmpeg (older tracks are packaged on first play) and the player
+falls back automatically when a package is unavailable.

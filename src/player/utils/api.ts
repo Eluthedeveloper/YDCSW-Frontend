@@ -1,4 +1,4 @@
-import { API_BASE, uploadUrl as baseUploadUrl, trackStreamUrl as baseTrackStreamUrl } from '../../lib/apiBase';
+import { API_BASE, uploadUrl as baseUploadUrl, trackStreamUrl as baseTrackStreamUrl, trackHlsUrl as baseTrackHlsUrl } from '../../lib/apiBase';
 import { getFingerprint } from './fingerprint';
 import type {
   AuthUser, Comment, MeUpdateInput, CreateUserInput, Program,
@@ -11,6 +11,7 @@ import type {
 
 export const uploadUrl = baseUploadUrl;
 export const trackStreamUrl = baseTrackStreamUrl;
+export const trackHlsUrl = baseTrackHlsUrl;
 
 // Matches the server's FINGERPRINT_RE. Rejecting a malformed value client-side
 // keeps it out of the request entirely; the server still validates.

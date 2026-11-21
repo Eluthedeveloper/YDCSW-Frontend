@@ -8,6 +8,7 @@ import type { Track } from '../utils/types';
 vi.mock('../utils/api', () => ({
   api: { recordListen: vi.fn().mockResolvedValue({ success: true }) },
   trackStreamUrl: (filePath: string) => `/uploads/tracks/${filePath.replace(/\.[^./\\]+$/, '')}.stream`,
+  trackHlsUrl: (filePath: string) => `/uploads/hls/${filePath.replace(/\.[^./\\]+$/, '')}/index.m3u8`,
 }));
 
 const trackA: Track = {
