@@ -495,11 +495,37 @@ describe('playback errors', () => {
       expect(read('error')).toBe('none');
 
       await act(async () => {
-        vi.advanceTimersByTime(12_000);
+        vi.advanceTimersByTime(20_000);
       });
 
       expect(read('error')).toBe('network');
       expect(read('buffering')).toBe('false');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not report a slow stream that keeps making progress', async () => {
+    vi.useFakeTimers();
+    try {
+      mount();
+      await act(async () => {
+        screen.getByText('playA').click();
+      });
+
+      await act(async () => {
+        audioEl?.dispatchEvent(new Event('waiting'));
+      });
+
+      await act(async () => {
+        vi.advanceTimersByTime(19_000);
+        audioEl?.dispatchEvent(new Event('progress'));
+        vi.advanceTimersByTime(19_000);
+        audioEl?.dispatchEvent(new Event('progress'));
+        vi.advanceTimersByTime(19_000);
+      });
+
+      expect(read('error')).toBe('none');
     } finally {
       vi.useRealTimers();
     }

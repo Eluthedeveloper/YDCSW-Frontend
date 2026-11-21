@@ -126,7 +126,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
    * progress bar frozen, with nothing the listener could act on. The watchdog
    * turns that silence into the same error-and-retry the other failures use.
    */
-  const STALL_TIMEOUT_MS = 12000;
+  const STALL_TIMEOUT_MS = 20000;
   const HLS_START_TIMEOUT_MS = 2000;
 
   const clearStallWatchdog = useCallback(() => {
@@ -260,6 +260,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         setProgress(audio.currentTime);
       }
       setDuration(audio.duration || 0);
+      if (stallTimerRef.current !== null) armStallWatchdog();
+    });
+
+    audio.addEventListener('progress', () => {
+      if (stallTimerRef.current !== null) armStallWatchdog();
     });
 
     audio.addEventListener('ended', () => {
