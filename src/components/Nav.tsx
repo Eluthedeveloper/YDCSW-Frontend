@@ -300,14 +300,15 @@ export function Nav(): React.ReactElement {
               </div>
             )}
           </li>
-          {/* Services/Programs/Blog/Gallery are collapsed into "More" below xl,
-              where long locale labels would otherwise overflow the bar. */}
-          <li className="hidden min-w-0 xl:flex">
+          {/* Services and Blog stay visible as independent links at every
+              desktop width. Gallery is the only item that collapses into
+              "More", and only for Oromo where the label needs the room. */}
+          <li className="flex min-w-0">
             <NavLink to="/services" className={desktopLink}>
               <span className="truncate">{t("nav.services")}</span>
             </NavLink>
           </li>
-          <li className="hidden min-w-0 xl:flex">
+          <li className="flex min-w-0">
             <NavLink to="/blog" className={desktopLink}>
               <span className="truncate">{t("nav.blog")}</span>
             </NavLink>
@@ -345,48 +346,40 @@ export function Nav(): React.ReactElement {
               </div>
             )}
           </li>
-          <li className="relative flex min-w-0 xl:hidden" data-more-dropdown>
-            <button
-              onClick={() => setMoreOpen((p) => !p)}
-              aria-expanded={moreOpen}
-              aria-haspopup="true"
-              className={desktopTrigger(
-                ["/services", "/blog", "/gallery"].some((p) => pathname.startsWith(p)) ||
-                moreOpen
-              )}
-            >
-              <span className="truncate">{t("nav.more")}</span>
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                className={`h-3 w-3 shrink-0 transition-transform duration-200 ${moreOpen ? "rotate-180" : ""}`}
-                stroke="currentColor"
-                strokeWidth="2.5"
+          {isOromo && (
+            <li className="relative flex min-w-0" data-more-dropdown>
+              <button
+                onClick={() => setMoreOpen((p) => !p)}
+                aria-expanded={moreOpen}
+                aria-haspopup="true"
+                className={desktopTrigger(
+                  pathname.startsWith("/gallery") || moreOpen
+                )}
               >
-                <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-            {moreOpen && (
-              <div className="absolute top-full left-0 mt-3 w-60 origin-top-left overflow-hidden rounded-2xl border border-white/10 bg-primary/95 p-2 shadow-[var(--shadow-elegant)] ring-1 ring-gold/10 backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-150">
-                {[
-                  { to: "/services", label: t("nav.services") },
-                  { to: "/blog", label: t("nav.blog") },
-                  // Gallery sits in the bar itself for en/am, so only Oromo —
-                  // whose labels need the room — keeps it collapsed here.
-                  ...(!isOromo ? [] : [{ to: "/gallery", label: t("nav.gallery") }]),
-                ].map((item) => (
+                <span className="truncate">{t("nav.more")}</span>
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  className={`h-3 w-3 shrink-0 transition-transform duration-200 ${moreOpen ? "rotate-180" : ""}`}
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                >
+                  <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              {moreOpen && (
+                <div className="absolute top-full left-0 mt-3 w-60 origin-top-left overflow-hidden rounded-2xl border border-white/10 bg-primary/95 p-2 shadow-[var(--shadow-elegant)] ring-1 ring-gold/10 backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-150">
                   <Link
-                    key={item.to}
-                    to={item.to}
+                    to="/gallery"
                     onClick={() => setMoreOpen(false)}
                     className={dropdownItem}
                   >
-                    {item.label}
+                    {t("nav.gallery")}
                   </Link>
-                ))}
-              </div>
-            )}
-          </li>
+                </div>
+              )}
+            </li>
+          )}
           {/* Gallery is a visible bar item for en/am; Oromo keeps it in More. */}
           {!isOromo && (
             <li className="flex min-w-0">
