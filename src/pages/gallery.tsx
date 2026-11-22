@@ -15,8 +15,6 @@ type Photo = {
   src: string;
   caption?: string;
   tag?: string;
-  albumTitle?: string;
-  description?: string;
 };
 
 // Shown when the API is unreachable or no album has been created yet, so the
@@ -55,8 +53,6 @@ export function GalleryPage(): React.ReactElement {
     ? activeAlbum.photos.map((photo) => ({
         src: uploadUrl(`albums/${photo.file_name}`),
         caption: photo.caption?.trim() || undefined,
-        albumTitle: activeAlbum.title,
-        description: activeAlbum.description ?? undefined,
       }))
     : [];
 
@@ -65,8 +61,7 @@ export function GalleryPage(): React.ReactElement {
   const selectedPhoto =
     selectedIndex !== null ? photoList[selectedIndex] ?? null : null;
 
-  const selectedTitle =
-    selectedPhoto?.caption || selectedPhoto?.albumTitle || "";
+  const selectedTitle = selectedPhoto?.caption || "";
   const selectedTag =
     selectedPhoto?.tag && selectedPhoto.tag !== selectedTitle
       ? selectedPhoto.tag
@@ -233,7 +228,12 @@ export function GalleryPage(): React.ReactElement {
                   {t('gallery.backToAlbums')}
                 </button>
 
-                <p className="mb-6 text-xs uppercase tracking-[0.3em] text-gold">{activeAlbum.title}</p>
+                <div className="mb-6">
+                  <p className="text-xs uppercase tracking-[0.3em] text-gold">{activeAlbum.title}</p>
+                  {activeAlbum.description && (
+                    <p className="mt-2 max-w-3xl text-sm text-muted-foreground">{activeAlbum.description}</p>
+                  )}
+                </div>
 
                 {albumPhotos.length === 0 ? (
                   <p className="py-16 text-center text-muted-foreground">{t('gallery.emptyAlbum')}</p>
@@ -298,7 +298,7 @@ export function GalleryPage(): React.ReactElement {
             >
               <img
                 src={selectedPhoto.src}
-                alt={selectedTitle || "Gallery photo"}
+                alt={selectedPhoto.caption || activeAlbum?.title || "Gallery photo"}
                 className="max-h-[70vh] w-auto max-w-full object-contain"
               />
 
@@ -335,16 +335,11 @@ export function GalleryPage(): React.ReactElement {
               )}
             </div>
 
-            {(selectedTitle || selectedPhoto.description || selectedTag) && (
+            {(selectedTitle || selectedTag) && (
               <div className="flex shrink-0 flex-col gap-3 p-6 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0 flex-1">
                   {selectedTitle && (
                     <p className="break-words font-serif text-xl text-foreground">{selectedTitle}</p>
-                  )}
-                  {selectedPhoto.description && (
-                    <p className="mt-2 whitespace-pre-wrap break-words text-sm text-muted-foreground">
-                      {selectedPhoto.description}
-                    </p>
                   )}
                 </div>
                 {selectedTag && (
