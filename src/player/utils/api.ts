@@ -50,8 +50,8 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   }
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Request failed' }));
-    throw new ApiError(err.error || 'Request failed', res.status);
+    const text = await res.text().catch(() => '');
+    throw new ApiError(errorTextFromJsonText(text) || httpErrorMessage(res.status, text), res.status);
   }
   return res.json() as Promise<T>;
 }
@@ -72,9 +72,9 @@ export class ApiError extends Error {
  * `{}`, and `{}` is a perfectly good object — so checking only the shape would
  * let a truncated or empty 2xx body resolve as a successful empty result.
  */
-async function readJson(res: Response): Promise<{ value: unknown; parsed: boolean }> {
+function parseJsonText(text: string): { value: unknown; parsed: boolean } {
   try {
-    return { value: await res.json(), parsed: true };
+    return { value: JSON.parse(text), parsed: true };
   } catch {
     return { value: undefined, parsed: false };
   }
@@ -85,6 +85,28 @@ function errorTextFrom(json: { value: unknown }): string | undefined {
   if (json.value === null || typeof json.value !== 'object') return undefined;
   const { error } = json.value as { error?: unknown };
   return typeof error === 'string' ? error : undefined;
+}
+
+function errorTextFromJsonText(text: string): string | undefined {
+  return errorTextFrom(parseJsonText(text));
+}
+
+/** Strips markup and collapses whitespace so an HTML error page is readable. */
+function bodySnippet(text: string): string {
+  return text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160);
+}
+
+/**
+ * Message for a failed response that carried no JSON `error`.
+ *
+ * A bare "Request failed" hides where the failure happened. Naming the status
+ * (and, for an HTML error page, the start of the text) tells the difference
+ * between a Cloudflare timeout (522/524), a proxy body limit (413) and a real
+ * API error, none of which the admin can act on otherwise.
+ */
+function httpErrorMessage(status: number, text: string): string {
+  const snippet = bodySnippet(text);
+  return snippet ? `Request failed (HTTP ${status}): ${snippet}` : `Request failed (HTTP ${status})`;
 }
 
 /** Multipart upload helper: no Content-Type, so the browser sets the boundary. */
@@ -112,9 +134,10 @@ async function formRequest<T>(
     throw new Error('Network error. Please check your connection.');
   }
 
-  const json = await readJson(res);
+  const text = await res.text().catch(() => '');
+  const json = parseJsonText(text);
   if (!res.ok) {
-    throw new ApiError(errorTextFrom(json) || 'Request failed', res.status);
+    throw new ApiError(errorTextFrom(json) || httpErrorMessage(res.status, text), res.status);
   }
 
   // A 2xx whose body is empty or not an object means the server replied before
@@ -172,20 +195,14 @@ function formRequestWithProgress<T>(
     });
 
     xhr.addEventListener('load', () => {
-      let value: unknown;
-      let parsed = true;
-      try {
-        value = JSON.parse(xhr.responseText);
-      } catch {
-        parsed = false;
-      }
-      const json = { value, parsed };
+      const text = xhr.responseText;
+      const json = parseJsonText(text);
 
       if (xhr.status < 200 || xhr.status >= 300) {
-        reject(new ApiError(errorTextFrom(json) || 'Request failed', xhr.status));
+        reject(new ApiError(errorTextFrom(json) || httpErrorMessage(xhr.status, text), xhr.status));
         return;
       }
-      if (!parsed || value === null || typeof value !== 'object') {
+      if (!json.parsed || json.value === null || typeof json.value !== 'object') {
         reject(new ApiError('Malformed response from server', xhr.status));
         return;
       }
@@ -193,7 +210,7 @@ function formRequestWithProgress<T>(
       // The load event fires once the body is in, so this is the only point
       // where reporting 100% is honest.
       onProgress(100);
-      resolve(value as T);
+      resolve(json.value as T);
     });
 
     xhr.addEventListener('error', () =>

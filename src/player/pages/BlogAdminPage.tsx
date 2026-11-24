@@ -84,8 +84,10 @@ export default function BlogAdminPage() {
   // Compress first, then enforce the server's cap on the result. A phone photo
   // over the raw limit often shrinks well below it, so checking before
   // compression was refusing exactly the files compression exists to fix.
+  // Blog images render at most ~800 px wide, so 1600 px is still crisp while
+  // keeping a slow mobile upload to a few hundred KB per photo.
   const prepareImage = async (file: File): Promise<File> => {
-    const compressed = await compressImage(file);
+    const compressed = await compressImage(file, { maxDim: 1600, quality: 0.8 });
     if (compressed.size > MAX_IMAGE_BYTES) {
       throw new Error(
         `"${file.name}" is still larger than ${MAX_IMAGE_MB} MB after compression. Please choose a smaller photo.`

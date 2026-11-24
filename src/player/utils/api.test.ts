@@ -1,14 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { api, ApiError } from './api';
+import { api } from './api';
 
 const originalFetch = globalThis.fetch;
 const fetchMock = vi.fn();
 
-function jsonResponse(body: unknown, status = 200): Response {
+function jsonResponse(body: unknown, status = 200, text = JSON.stringify(body)): Response {
   return {
     ok: status >= 200 && status < 300,
     status,
     json: async () => body,
+    text: async () => text,
   } as Response;
 }
 
@@ -109,9 +110,10 @@ describe('api client', () => {
       json: async () => {
         throw new Error('invalid json');
       },
+      text: async () => '<html><body>error code: 522</body></html>',
     } as unknown as Response);
 
-    await expect(api.getPrograms()).rejects.toBeInstanceOf(ApiError);
+    await expect(api.getPrograms()).rejects.toThrow(/Request failed \(HTTP 500\): error code: 522/);
   });
 
   it('rejects a 2xx upload whose body is empty instead of resolving as empty', async () => {
@@ -124,6 +126,7 @@ describe('api client', () => {
       json: async () => {
         throw new Error('Unexpected end of JSON input');
       },
+      text: async () => '',
     } as unknown as Response);
 
     const form = new FormData();

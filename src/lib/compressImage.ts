@@ -50,6 +50,26 @@ function toBlob(canvas: HTMLCanvasElement, type: string, quality: number): Promi
   return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
 }
 
+// Safari has never encoded WebP from a canvas: asking for `image/webp` returns
+// a lossless PNG instead, often several times larger than the JPEG it replaced.
+// The blob's real type decides the extension, and the size check at the call
+// site keeps that PNG from replacing a smaller, already-uploadable JPEG.
+const EXT_BY_TYPE: Record<string, string> = {
+  'image/webp': 'webp',
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+};
+
+function fileForBlob(blob: Blob | null, base: string): File | null {
+  if (!blob || blob.size === 0) return null;
+  // `image/jpg` is a nonstandard alias some platforms use; the server only
+  // allows `image/jpeg`, so normalise it before naming the file.
+  const type = blob.type.toLowerCase() === 'image/jpg' ? 'image/jpeg' : blob.type.toLowerCase();
+  const ext = EXT_BY_TYPE[type];
+  if (!ext) return null;
+  return new File([blob], `${base}.${ext}`, { type, lastModified: Date.now() });
+}
+
 /** Decodes a Blob with createImageBitmap, falling back to an <img> tag. */
 async function decodeImage(blob: Blob): Promise<{
   image: CanvasImageSource;
@@ -172,24 +192,21 @@ export async function compressImage(file: File, opts: CompressOptions = {}): Pro
     ctx.fillRect(0, 0, targetW, targetH);
     ctx.drawImage(decoded.image, 0, 0, targetW, targetH);
 
-    const inUploadableFormat = isUploadableName(file.name, file.type);
+    // Use the converted source, not `file`: for a HEIC, `file` is still the
+    // non-uploadable HEIC, and treating it as such would force the larger PNG
+    // fallback through even when heic2any already produced a small JPEG.
+    const inUploadableFormat = isUploadableName(sourceName, source.type);
     const outputBase = baseName(file.name);
 
-    const webp = await toBlob(canvas, 'image/webp', quality);
-    if (webp && webp.size > 0 && (webp.size < source.size || !inUploadableFormat)) {
-      return new File([webp], `${outputBase}.webp`, {
-        type: 'image/webp',
-        lastModified: Date.now(),
-      });
+    const webp = fileForBlob(await toBlob(canvas, 'image/webp', quality), outputBase);
+    if (webp && (webp.size < source.size || !inUploadableFormat)) {
+      return webp;
     }
 
     // WebP unsupported (older Safari) or larger than the source — try JPEG.
-    const jpeg = await toBlob(canvas, 'image/jpeg', quality);
-    if (jpeg && jpeg.size > 0 && (jpeg.size < source.size || !inUploadableFormat)) {
-      return new File([jpeg], `${outputBase}.jpg`, {
-        type: 'image/jpeg',
-        lastModified: Date.now(),
-      });
+    const jpeg = fileForBlob(await toBlob(canvas, 'image/jpeg', quality), outputBase);
+    if (jpeg && (jpeg.size < source.size || !inUploadableFormat)) {
+      return jpeg;
     }
 
     return original();
