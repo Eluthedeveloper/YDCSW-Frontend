@@ -25,6 +25,11 @@ export default defineConfig({
         // are not part of the program library, so they stay out of the install
         // payload and are cached on demand by the runtime rule below.
         globPatterns: ['**/*.{js,css,html,svg,webmanifest,ico}'],
+        // The HEIC decoder is a lazy 1.3 MB chunk used only by the admin
+        // console. Precache is installed by the program library, which never
+        // needs it, so it stays out of the install payload and is fetched on
+        // demand the first time an editor picks a HEIC photo.
+        globIgnores: ['**/heic2any-*.js'],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//],
         cleanupOutdatedCaches: true,

@@ -8,8 +8,13 @@ import { toast } from 'sonner';
 import { Newspaper, Plus, Trash2, X, Loader2, Pencil, Check, Eye, EyeOff } from 'lucide-react';
 import type { BlogPost } from '../utils/types';
 
+// The API cap applies to the compressed result, so only an unreasonably large
+// pick is refused up front — that check exists to keep a phone from running out
+// of memory while decoding, not to mirror the server limit.
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 const MAX_IMAGE_MB = MAX_IMAGE_BYTES / (1024 * 1024);
+const MAX_SOURCE_BYTES = 60 * 1024 * 1024;
+const MAX_SOURCE_MB = MAX_SOURCE_BYTES / (1024 * 1024);
 // Mirrors the server's MAX_BLOG_IMAGES; the form refuses the seventh photo
 // before an upload that would be rejected anyway.
 const MAX_PHOTOS = 6;
@@ -69,11 +74,24 @@ export default function BlogAdminPage() {
 
   const checkImage = (file: File | null | undefined): file is File => {
     if (!file) return false;
-    if (file.size > MAX_IMAGE_BYTES) {
-      toast.error(`Image is too large even after compression. Max is ${MAX_IMAGE_MB} MB.`);
+    if (file.size > MAX_SOURCE_BYTES) {
+      toast.error(`That photo is too large to prepare for upload. Max is ${MAX_SOURCE_MB} MB.`);
       return false;
     }
     return true;
+  };
+
+  // Compress first, then enforce the server's cap on the result. A phone photo
+  // over the raw limit often shrinks well below it, so checking before
+  // compression was refusing exactly the files compression exists to fix.
+  const prepareImage = async (file: File): Promise<File> => {
+    const compressed = await compressImage(file);
+    if (compressed.size > MAX_IMAGE_BYTES) {
+      throw new Error(
+        `"${file.name}" is still larger than ${MAX_IMAGE_MB} MB after compression. Please choose a smaller photo.`
+      );
+    }
+    return compressed;
   };
 
   const closeForm = () => {
@@ -119,8 +137,8 @@ export default function BlogAdminPage() {
       fd.append('excerpt', form.excerpt);
       fd.append('body', form.body);
       fd.append('published', String(form.published));
-      if (cover) fd.append('cover', await compressImage(cover));
-      for (const photo of gallery) fd.append('images', await compressImage(photo));
+      if (cover) fd.append('cover', await prepareImage(cover));
+      for (const photo of gallery) fd.append('images', await prepareImage(photo));
       if (editing) fd.append('keepImages', JSON.stringify(keepImages));
       if (editing) {
         await api.updateBlogPost(editing.id, fd, cover || gallery.length > 0 ? setUploadPercent : undefined);
